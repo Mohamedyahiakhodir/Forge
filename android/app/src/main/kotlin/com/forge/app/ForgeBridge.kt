@@ -93,6 +93,29 @@ class ForgeBridge(private val activity: MainActivity, private val store: FileSto
         activity.runOnUiThread { activity.launchKeyImport(alias, password) }
     }
 
+    /** Fails fast (before a 5-minute cloud build) if the key password is wrong. */
+    @JavascriptInterface fun keyCheck(alias: String, password: String) = reply {
+        try { com.forge.app.sign.KeyTools.load(activity.vault.p12(alias), password.toCharArray()); true }
+        catch (e: java.io.IOException) { throw IllegalArgumentException("WRONG_PASSWORD") }
+    }
+
+    // ----- GitHub cloud build -----
+    @JavascriptInterface fun ghStatus() = reply { activity.github.status() }
+    @JavascriptInterface fun ghConnect(token: String) = reply { activity.github.connect(token); null }
+    @JavascriptInterface fun ghDisconnect() = reply { activity.github.disconnect() }
+    @JavascriptInterface fun ghBuild(project: String, repo: String) = reply {
+        require(repo.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "Invalid repository name" }
+        store.resolve(project)
+        activity.github.build(project, repo); null
+    }
+
+    /** Only https links to github.com are opened (used for the token-creation page). */
+    @JavascriptInterface fun openUrl(url: String) = reply {
+        val u = android.net.Uri.parse(url)
+        require(u.scheme == "https" && u.host == "github.com") { "Blocked URL" }
+        activity.runOnUiThread { activity.startActivity(Intent(Intent.ACTION_VIEW, u)) }
+    }
+
     @JavascriptInterface fun signAab(inputRel: String, alias: String, password: String, outputRel: String) = reply {
         val input = store.resolve(inputRel); require(input.isFile) { "Bundle not found" }
         val output = store.resolve(outputRel)

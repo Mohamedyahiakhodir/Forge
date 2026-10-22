@@ -66,6 +66,12 @@ export interface Bridge {
   keyExportCert(alias: string): void;
   keyImport(alias: string, password: string): void;
   signAab(inputRel: string, alias: string, password: string, outputRel: string): void;
+  keyCheck(alias: string, password: string): boolean;
+  ghStatus(): { connected: boolean; login: string };
+  ghConnect(token: string): void;
+  ghDisconnect(): void;
+  ghBuild(project: string, repo: string): void;
+  openUrl(url: string): void;
   saveFileAs(rel: string, displayName: string, mime: string): void;
   importFile(project: string): void;
   assetUrl(path: string): string;
@@ -102,6 +108,12 @@ const nativeBridge: Bridge = {
   keyExportCert: (a) => native('keyExportCert', a),
   keyImport: (a, p) => native('keyImport', a, p),
   signAab: (i, a, p, o) => native('signAab', i, a, p, o),
+  keyCheck: (a, p) => native('keyCheck', a, p),
+  ghStatus: () => native('ghStatus'),
+  ghConnect: (t) => native('ghConnect', t),
+  ghDisconnect: () => native('ghDisconnect'),
+  ghBuild: (p, r) => native('ghBuild', p, r),
+  openUrl: (u) => native('openUrl', u),
   saveFileAs: (r, n, m) => native('saveFileAs', r, n, m),
   importFile: (p) => native('importFile', p),
   assetUrl: (p) => `${ASSET_ORIGIN}/files/${p.split('/').map(encodeURIComponent).join('/')}`,
@@ -190,6 +202,12 @@ const mockBridge: Bridge = {
   keyExportCert() { alert('Needs the Android app'); },
   keyImport() { alert('Needs the Android app'); },
   signAab() { throw new Error('Signing needs the Android app'); },
+  keyCheck: () => true,
+  ghStatus: () => ({ connected: false, login: '' }),
+  ghConnect() { throw new Error('Needs the Android app'); },
+  ghDisconnect() { /* needs Android */ },
+  ghBuild() { throw new Error('Needs the Android app'); },
+  openUrl: (u) => { window.open(u, '_blank'); },
   saveFileAs() { alert('Needs the Android app'); },
   importFile() { alert('Needs the Android app'); },
   assetUrl: (p) => {

@@ -2,6 +2,7 @@ import { bridge } from '../native';
 import { h, fullSheet, toast, debounce, joinPath, extOf } from '../ui';
 import { L, loadConfig, saveConfig, slug, type PublishConfig } from './config';
 import { renderKeySection } from './keys';
+import { renderBuildSection } from './build';
 import { runPreflight, hasErrors, type Check } from './preflight';
 import { generateProject, androidDir } from './generate';
 
@@ -100,6 +101,11 @@ export function openPublish(project: string): void {
     const keyBox = h('div', {});
     body.append(keyBox);
     renderKeySection(keyBox, project, () => slug(cfg.appName), () => cfg.versionCode, () => { void refresh(); });
+
+    section(L('البناء والتوقيع', 'Build and sign'));
+    const buildBox = h('div', {});
+    body.append(buildBox);
+    renderBuildSection(buildBox, project, cfg, () => { try { return bridge.keyList().length > 0; } catch { return false; } }, () => { cfg.versionCode += 1; saveConfig(project, cfg); render(); });
 
     section(L('الفحص قبل النشر', 'Pre-publish checks'));
     body.append(checksBox, genBtn, status);

@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- No storage permissions: all file access goes through app-private storage and the system file pickers (SAF). -->
+    <!-- Internet is used only to talk to api.github.com for cloud builds. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="false"

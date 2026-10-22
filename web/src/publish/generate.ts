@@ -271,7 +271,7 @@ dependencies {
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   workflow_dispatch:
 
 jobs:

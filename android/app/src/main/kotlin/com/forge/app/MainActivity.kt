@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
 
     // ----- signing keys + generic "save a file to the phone" / "import a file into a project" -----
     lateinit var vault: KeyVault
+    lateinit var github: GitHub
     private var pendingSave: File? = null
     private var pendingImportProject: String? = null
     private var pendingKeyAlias: String? = null
@@ -143,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         store = FileStore(File(filesDir, "projects"))
         vault = KeyVault(File(filesDir, "keys"))
+        github = GitHub(File(filesDir, "gh"), store) { name, payload -> emit(name, payload) }
 
         val loader = WebViewAssetLoader.Builder()
             .setDomain(ORIGIN_HOST)

@@ -22,7 +22,18 @@ function wire(): void {
   onNative('keyError', (p) => onKeyError?.(p));
 }
 
-const fmtDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+/** Signs a file already inside the project; results arrive through the shared 'signDone' / 'signError' listeners. */
+export function signWithHandlers(inRel: string, outRel: string, password: string,
+  done: (r: { path: string; size: number }) => void, error: (message: string) => void): void {
+  wire();
+  onSignDone = done;
+  onSignError = (e) => error(explain(e.message));
+  try { bridge.signAab(inRel, ALIAS, password, outRel); } catch (err: any) { error(explain(String(err.message ?? err))); }
+}
+
+export const explainError = (m: string): string => explain(m);
+
+const fmtDate =(ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 const explain = (msg: string): string => {
   if (msg === 'WRONG_PASSWORD') return L('كلمة سر المفتاح غلط. حاول تاني بنفس الكلمة اللي اخترتها وقت إنشاء المفتاح.', 'Wrong key password. Try again with the password you chose when creating the key.');

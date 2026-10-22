@@ -161,6 +161,8 @@ input[type=color].field { height: 44px; padding: 4px; }
 .check.warn { border-color: #f5a623; }
 .check .cf { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .btn:disabled { opacity: .45; }
+.build-log { padding: 8px 2px; color: var(--muted); line-height: 1.6; min-height: 1.2em; }
+.build-excerpt { direction: ltr; text-align: start; white-space: pre-wrap; word-break: break-word; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font: 12px/1.5 'JetBrains Mono', monospace; max-height: 240px; overflow: auto; user-select: text; }
 
 .search-panel { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 .sp-row { display: flex; gap: 6px; align-items: center; } .sp-row.wrap { flex-wrap: wrap; }
