@@ -3,6 +3,7 @@ import { h, fullSheet, toast, debounce, joinPath, extOf } from '../ui';
 import { L, loadConfig, saveConfig, slug, type PublishConfig } from './config';
 import { renderKeySection } from './keys';
 import { renderBuildSection } from './build';
+import { renderCredsSection } from './creds';
 import { runPreflight, hasErrors, type Check } from './preflight';
 import { generateProject, androidDir } from './generate';
 
@@ -101,6 +102,11 @@ export function openPublish(project: string): void {
     const keyBox = h('div', {});
     body.append(keyBox);
     renderKeySection(keyBox, project, () => slug(cfg.appName), () => cfg.versionCode, () => { void refresh(); });
+
+    section(L('الملفات والبصمات (اختياري)', 'Files and fingerprints (optional)'));
+    const credsBox = h('div', {});
+    body.append(credsBox);
+    renderCredsSection(credsBox, project, cfg, () => { void refresh(); });
 
     section(L('البناء والتوقيع', 'Build and sign'));
     const buildBox = h('div', {});

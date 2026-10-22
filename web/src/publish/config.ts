@@ -20,6 +20,9 @@ export interface PublishConfig {
   privacyUrl: string;
   internet: boolean;
   vibrate: boolean;
+  googleClientId: string;
+  playSha1: string;
+  playSha256: string;
 }
 
 export const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/^[0-9]+/, '') || 'app';
@@ -39,6 +42,9 @@ export function defaults(project: string): PublishConfig {
     privacyUrl: '',
     internet: true,
     vibrate: false,
+    googleClientId: '',
+    playSha1: '',
+    playSha256: '',
   };
 }
 

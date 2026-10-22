@@ -31,7 +31,15 @@ export function signWithHandlers(inRel: string, outRel: string, password: string
   try { bridge.signAab(inRel, ALIAS, password, outRel); } catch (err: any) { error(explain(String(err.message ?? err))); }
 }
 
-export const explainError = (m: string): string => explain(m);
+/** Lets another section ask the user for a file and receive it once it has been copied into the project. */
+export function pickFileIntoProject(project: string, cb: (path: string) => void, onError: (m: string) => void): void {
+  wire();
+  onFileImported = (p) => cb(p.path);
+  onKeyError = (e) => onError(explain(e.message));
+  try { bridge.importFile(project); } catch (err: any) { onError(String(err.message ?? err)); }
+}
+
+export const explainError =(m: string): string => explain(m);
 
 const fmtDate =(ms: number) => new Date(ms).toISOString().slice(0, 10);
 

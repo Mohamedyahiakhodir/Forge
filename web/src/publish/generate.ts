@@ -230,15 +230,17 @@ dependencyResolutionManagement {
 rootProject.name = "WebApp"
 include(":app")
 `);
+  const gsPath = `${project}/.forge/google-services.json`;
+  const hasGs = bridge.stat(gsPath).exists;
   put('build.gradle.kts', `plugins {
     id("com.android.application") version "8.9.1" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false${hasGs ? '\n    id("com.google.gms.google-services") version "4.4.2" apply false' : ''}
 }
 `);
   put('gradle.properties', 'org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8\nandroid.useAndroidX=true\nandroid.nonTransitiveRClass=true\n');
   put('app/build.gradle.kts', `plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.android")${hasGs ? '\n    id("com.google.gms.google-services")' : ''}
 }
 
 android {
@@ -287,6 +289,13 @@ dependencies {
 </resources>
 `);
   put('app/src/main/assets/offline.html', offlinePage(c.appName, c.themeColor));
+  if (c.googleClientId.trim()) {
+    put('app/src/main/res/values/forge_config.xml', `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">${xmlEsc(c.googleClientId.trim())}</string>\n</resources>\n`);
+  }
+  if (hasGs) {
+    bridge.copy(gsPath, `${base}/app/google-services.json`);
+    n++;
+  }
 
   put('.github/workflows/build-aab.yml', `name: Build AAB
 
@@ -323,7 +332,8 @@ jobs:
     const www = `${base}/app/src/main/assets/www`;
     bridge.mkdir(www);
     for (const e of bridge.list(project)) {
-      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      // Credentials must never end up inside the publicly readable site files.
+      if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'google-services.json') continue;
       bridge.copy(joinPath(project, e.name), joinPath(www, e.name));
       n++;
     }

@@ -1,6 +1,7 @@
 import { bridge } from '../native';
 import { dirName, joinPath, extOf } from '../ui';
 import { L, TARGET_SDK, type PublishConfig } from './config';
+import { inspectGoogleServices, isClientId } from './creds-logic';
 
 export interface Check { level: 'ok' | 'warn' | 'error'; title: string; fix?: string }
 
@@ -146,6 +147,44 @@ export async function runPreflight(project: string, c: PublishConfig): Promise<C
   try { hasKey = bridge.keyList().length > 0; } catch { hasKey = false; }
   if (!hasKey) r.push(warn(L('لسه مفيش مفتاح توقيع', 'No signing key yet'), L('أنشئ مفتاح التوقيع من قسم "مفتاح التوقيع" تحت. من غيره مش هتقدر توقّع ملف الـAAB.', 'Create the key in the "Signing key" section below. Without it you cannot sign the AAB.')));
   else r.push(ok(L('مفتاح التوقيع موجود', 'Signing key is present')));
+
+  // --- Firebase / Google sign-in files (optional) ---
+  const gsPath = `${project}/.forge/google-services.json`;
+  if (bridge.stat(`${project}/google-services.json`).exists) {
+    r.push(warn(L('ملف google-services.json جوه ملفات الموقع', 'google-services.json is inside the site files'),
+      L('الملف ده فيه مفاتيح ومينفعش يبقى في ملفات الموقع. هيتم تجاهله في التطبيق. ارفعه من قسم "الملفات والبصمات" بدل كده وامسحه من هنا.', 'This file holds keys and must not sit in the site files. It is ignored in the app. Upload it from the "Files and fingerprints" section instead and delete it here.')));
+  }
+  if (bridge.stat(gsPath).exists) {
+    try {
+      const insp = inspectGoogleServices(JSON.parse(bridge.readText(gsPath)), pkg);
+      if (!insp.matchesPackage) {
+        r.push(err(L('google-services.json لا يطابق معرّف الحزمة', 'google-services.json does not match the package id'),
+          L(`الملف مسجّل لـ: ${insp.packages.join('، ') || '—'} وتطبيقك ${pkg}. في Firebase أضف تطبيق أندرويد باسم الحزمة ${pkg} ونزّل الملف تاني، أو غيّر معرّف الحزمة هنا.`,
+            `The file is for: ${insp.packages.join(', ') || '—'} but your app is ${pkg}. In Firebase add an Android app with package ${pkg} and download the file again, or change the package id here.`)));
+      } else {
+        r.push(ok(L(`ملف Firebase سليم (${insp.projectId})`, `Firebase file is valid (${insp.projectId})`)));
+        const keyOk = (label: string, sha: string) => {
+          if (!sha) return;
+          if (insp.registeredSha1.includes(sha)) r.push(ok(L(`بصمة ${label} مسجّلة في Firebase`, `${label} fingerprint is registered in Firebase`)));
+          else r.push(warn(L(`بصمة ${label} غير مسجّلة في Firebase`, `${label} fingerprint is not registered in Firebase`),
+            L(`Firebase Console ← إعدادات المشروع ← تطبيقك ← Add fingerprint، والصق: ${sha} ثم نزّل google-services.json الجديد وارفعه هنا. من غير كده تسجيل الدخول بجوجل مش هيشتغل.`,
+              `Firebase Console → Project settings → your app → Add fingerprint, paste: ${sha}, then download the new google-services.json and upload it here. Without this Google sign-in will not work.`)));
+        };
+        let uploadSha1 = '';
+        try { uploadSha1 = bridge.keyList()[0]?.sha1 ?? ''; } catch { uploadSha1 = ''; }
+        keyOk(L('مفتاح الرفع', 'upload key'), uploadSha1);
+        keyOk(L('توقيع Google Play', 'Google Play signing'), c.playSha1);
+        if (!c.playSha1) r.push(warn(L('بصمة توقيع Google Play مش مضافة', 'Google Play signing fingerprint not added'),
+          L('بعد أول رفع على Play، افتح Play Console ← Setup ← App signing وانسخ SHA-1 للـ"App signing key certificate" والصقه في "الملفات والبصمات". الدخول بجوجل في التطبيق المنشور بيعتمد عليها.',
+            'After the first Play upload, open Play Console → Setup → App signing, copy the SHA-1 of the "App signing key certificate" and paste it in "Files and fingerprints". Google sign-in in the published app depends on it.')));
+      }
+    } catch {
+      r.push(err(L('ملف google-services.json تالف', 'google-services.json is corrupt'), L('نزّله من Firebase تاني وارفعه من جديد.', 'Download it from Firebase again and re-upload.')));
+    }
+  }
+  if (c.googleClientId.trim() && !isClientId(c.googleClientId)) {
+    r.push(err(L('Google Client ID شكله غلط', 'Google Client ID looks wrong'), L('لازم يبقى شكله 123456789-abc.apps.googleusercontent.com. انسخه كامل من Google Cloud Console ← Credentials ← Web client.', 'It should look like 123456789-abc.apps.googleusercontent.com. Copy it fully from Google Cloud Console → Credentials → Web client.')));
+  }
 
   r.push(ok(L(`مستوى الـ API المستهدف = ${TARGET_SDK} (مطابق لمتطلبات Play)`, `Target API = ${TARGET_SDK} (meets Play requirements)`)));
   return r;

@@ -28,6 +28,10 @@ jobs:
         working-directory: web
         run: npx tsc -p .
 
+      - name: Web logic tests
+        working-directory: web
+        run: node test/creds.test.ts
+
       - name: Bundle web app into Android assets
         working-directory: web
         run: node build.mjs --out ../android/app/src/main/assets/web
@@ -82,3 +86,8 @@ jobs:
         run: gradle bundleRelease --stacktrace --no-daemon
       - name: Check AAB exists
         run: ls -l fixtures/webapp/app/build/outputs/bundle/release/app-release.aab
+      - name: Build unsigned AAB from the Firebase / Google sign-in fixture
+        working-directory: fixtures/webapp-firebase
+        run: gradle bundleRelease --stacktrace --no-daemon
+      - name: Check Firebase AAB exists
+        run: ls -l fixtures/webapp-firebase/app/build/outputs/bundle/release/app-release.aab
