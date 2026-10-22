@@ -38,7 +38,8 @@ file system mock. The Kotlin shell has **not been compiled or run on a device ye
 - [x] Step 2: upload key generated on the phone (RSA 2048, 30-year cert, PKCS#12), backup `.p12` + certificate `.pem` export, import of an existing key, AAB signing on device. CI unit tests prove a signed bundle passes `jarsigner -verify -strict` and tampering is detected. **Not yet tried on a real phone** (file pickers, password prompts, Arabic UI)
 - [x] Step 3 (compiles, **not run against real GitHub yet**): token stored encrypted (Android Keystore), private repo created, project pushed via Git Data API, workflow awaited, unsigned AAB downloaded, signed, versionCode auto-bumped, build failures explained in Arabic/English with the Gradle error excerpt
 - [x] Files and fingerprints wizard: smart paste/upload recognises google-services.json, Web Client ID, SHA-1/SHA-256; validates package match and registered fingerprints; wires the Google Services plugin + `default_web_client_id` into the generated project. Logic unit-tested in CI; a Firebase fixture builds an AAB in CI. Not tried on a phone
-- [ ] Native bridge (`window.Forge`): Google sign-in (Credential Manager), generic OAuth via Custom Tabs, FCM notifications
+- [x] Native bridge `window.Forge` + Google sign-in (Credential Manager, origin-locked, main-frame only); CI builds an AAB from a fixture using it (compile-verified, **not run on a device**; needs real Google Cloud OAuth clients). See docs/forge-bridge.md
+- [ ] Generic OAuth via Custom Tabs, FCM notifications
 - [ ] Camera / location / microphone permissions in the wrapper (needs runtime-permission handling)
 - Not guaranteed: Play review acceptance (policy, content, Data safety form are on the publisher)
 
