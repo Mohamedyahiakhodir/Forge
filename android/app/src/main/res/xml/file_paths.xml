@@ -2,4 +2,6 @@
 <paths>
     <files-path name="projects" path="projects/" />
     <cache-path name="export" path="export/" />
+    <!-- Files on shared storage (open with / share), usable only while "all files access" is granted. -->
+    <root-path name="device" path="" />
 </paths>

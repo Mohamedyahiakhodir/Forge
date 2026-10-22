@@ -15,6 +15,19 @@ import { buildSearchPanel } from './search';
 import { openSettings } from './settingsui';
 import { TEMPLATES } from './templates';
 import { openPublish } from './publish/wizard';
+import { openDeviceBrowser } from './devicefiles';
+import { isDevicePath } from './native';
+
+const projectLabel = (p: string): string => (p ? (isDevicePath(p) ? '📱 ' : '') + baseName(p) : '');
+
+function openDevice(): void {
+  openDeviceBrowser({
+    openFile: (p) => { void openFile(p); closeDrawer(); },
+    openAsProject: (p) => { void openProject(p); },
+    currentProject: () => project,
+    onChanged: () => tree.refresh(),
+  });
+}
 import { L } from './publish/config';
 
 type Kind = 'text' | 'image' | 'video' | 'audio' | 'pdf' | 'binary';
@@ -78,7 +91,7 @@ async function openProject(p: string, restoreTabs = false): Promise<void> {
   kvSave('currentProject', p);
   loadProjectSettings(p);
   tree.setRoot(p);
-  $('project-name').textContent = p || t('noProject');
+  $('project-name').textContent = projectLabel(p) || t('noProject');
   renderTabs();
   await showActive();
   updateGitBranch();
@@ -113,7 +126,11 @@ export async function openFile(path: string, line = 0, col = 0): Promise<void> {
         const { info, ext } = await ed.loadLangExt(path);
         tab.langId = info.id;
         tab.state = ed.makeState(text, path, ext, tab.readOnly);
-      } catch (e: any) { toast(t('error') + ': ' + (e.message ?? e)); return; }
+      } catch (e: any) {
+        if (String(e.message ?? e).includes('DEVICE_ACCESS_DENIED')) { toast(L('محتاج إذن الوصول لملفات الجهاز', 'Device file access is needed')); openDevice(); }
+        else toast(t('error') + ': ' + (e.message ?? e));
+        return;
+      }
     }
     tabs.push(tab);
     i = tabs.length - 1;
@@ -335,7 +352,9 @@ async function restoreSession(): Promise<void> {
   const s = kvJson<Session | null>('session', null);
   const last = kvJson<string>('currentProject', '');
   const projects = listProjects();
-  const proj = s?.project && projects.includes(s.project) ? s.project : projects.includes(last) ? last : projects[0] ?? '';
+  // A project may be a folder on shared storage ("@device/..."); it is restored only if it is still reachable.
+  const usable = (p: string | undefined): boolean => !!p && (projects.includes(p) || (isDevicePath(p) && (() => { try { return bridge.stat(p).isDir; } catch { return false; } })()));
+  const proj = usable(s?.project) ? s!.project : usable(last) ? last : projects[0] ?? '';
   if (!proj) { await openProject(''); return; }
   await openProject(proj, true);
   if (s && s.project === proj) {
@@ -548,6 +567,7 @@ function projectsSheet(): void {
     body.replaceChildren(
       h('div', { class: 'row wrap gap' },
         h('button', { class: 'btn primary', onclick: () => { sheet.close(); void createProject(); } }, '＋ ' + t('newProject')),
+        h('button', { class: 'btn', onclick: () => { sheet.close(); openDevice(); } }, L('📱 ملفات الجهاز', '📱 Device files')),
         h('button', { class: 'btn', onclick: () => { sheet.close(); bridge.importFolder(); } }, t('importFolder')),
         h('button', { class: 'btn', onclick: () => { sheet.close(); bridge.importZip(); } }, t('importZip'))),
       ...(ps.length ? ps.map((p) => h('div', { class: 'proj-row' + (p === project ? ' current' : '') },
@@ -602,7 +622,8 @@ function refreshEmptyState(): void {
     h('div', { class: 'big' }, '⌨️'),
     h('div', { class: 'et' }, project ? t('emptyEditor') : t('welcomeTitle')),
     h('div', { class: 'sub' }, project ? t('emptyEditorSub') : t('welcomeBody')),
-    project ? '' : h('button', { class: 'btn primary', onclick: () => void createProject() }, t('startProject')));
+    project ? '' : h('button', { class: 'btn primary', onclick: () => void createProject() }, t('startProject')),
+    h('button', { class: 'btn', onclick: openDevice }, L('📱 فتح ملف من الجهاز', '📱 Open a file from the device')));
 }
 
 function setPanel(mode: typeof panelMode | null): void {
@@ -661,7 +682,7 @@ function applyChrome(): void {
 function relabelStatic(): void {
   document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n!); });
   document.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle!); el.setAttribute('aria-label', el.title); });
-  $('project-name').textContent = project || t('noProject');
+  $('project-name').textContent = projectLabel(project) || t('noProject');
   refreshEmptyState();
   renderSide();
   keybar.rebuild();
@@ -720,6 +741,7 @@ export async function boot(): Promise<void> {
   $('preview-btn').onclick = togglePreview;
   $('new-file-btn').onclick = () => { if (project) void newItem(project, false); };
   $('new-folder-btn').onclick = () => { if (project) void newItem(project, true); };
+  $('device-btn').onclick = openDevice;
   $('hidden-btn').onclick = () => { update({ showHidden: !effective().showHidden }); };
   $('select-btn').onclick = () => { tree.setSelectMode(!tree.selectMode); renderSide(); };
   $('sel-delete').onclick = () => { if (tree.selected.size) void deleteItems([...tree.selected]); };

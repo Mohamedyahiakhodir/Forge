@@ -36,7 +36,8 @@ export interface PublishConfig {
 
 export const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/^[0-9]+/, '') || 'app';
 
-export function defaults(project: string): PublishConfig {
+export function defaults(projectPath: string): PublishConfig {
+  const project = projectPath.split('/').filter(Boolean).pop() ?? projectPath; // device projects are full paths
   return {
     appName: project.slice(0, 30),
     packageId: `com.yourname.${slug(project)}`,

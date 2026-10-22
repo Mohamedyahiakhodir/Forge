@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        store = FileStore(File(filesDir, "projects"))
+        store = FileStore(File(filesDir, "projects")) { hasDeviceAccess() }
         vault = KeyVault(File(filesDir, "keys"))
         github = GitHub(File(filesDir, "gh"), store) { name, payload -> emit(name, payload) }
 
@@ -150,6 +150,13 @@ class MainActivity : AppCompatActivity() {
             .setDomain(ORIGIN_HOST)
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .addPathHandler("/files/", WebViewAssetLoader.InternalStoragePathHandler(this, store.root))
+            // Media/images from shared storage for the viewers; only while "all files access" is granted.
+            .addPathHandler("/device/") { path ->
+                try {
+                    val f = store.resolve(FileStore.DEVICE + path)
+                    if (f.isFile) android.webkit.WebResourceResponse(Mime.of(f), null, java.io.FileInputStream(f)) else null
+                } catch (e: Exception) { null }
+            }
             .build()
 
         web = WebView(this).apply {
@@ -213,6 +220,84 @@ class MainActivity : AppCompatActivity() {
         // Let the web layer flush autosave + session before the process can be killed.
         web.evaluateJavascript("document.dispatchEvent(new Event('visibilitychange'))", null)
     }
+
+    override fun onResume() {
+        super.onResume()
+        // The user may have just granted (or revoked) file access in system settings.
+        emit("deviceAccessChanged", deviceStatus())
+    }
+
+    // ----- device (shared storage) access -----
+    fun hasDeviceAccess(): Boolean =
+        if (android.os.Build.VERSION.SDK_INT >= 30) android.os.Environment.isExternalStorageManager()
+        else androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    fun deviceStatus(): JSONObject {
+        val roots = org.json.JSONArray()
+        fun add(name: String, key: String, f: File?) {
+            if (f != null && f.exists()) roots.put(JSONObject().put("name", name).put("key", key).put("path", f.canonicalPath))
+        }
+        val primary = android.os.Environment.getExternalStorageDirectory()
+        add("Internal storage", "internal", primary)
+        for ((n, d) in listOf("Download" to android.os.Environment.DIRECTORY_DOWNLOADS, "Documents" to android.os.Environment.DIRECTORY_DOCUMENTS,
+            "DCIM" to android.os.Environment.DIRECTORY_DCIM, "Pictures" to android.os.Environment.DIRECTORY_PICTURES,
+            "Movies" to android.os.Environment.DIRECTORY_MOVIES, "Music" to android.os.Environment.DIRECTORY_MUSIC)) {
+            add(n, n.lowercase(), android.os.Environment.getExternalStoragePublicDirectory(d))
+        }
+        // Removable volumes (SD cards): the root is the part of the app-specific dir before /Android/data.
+        for (d in getExternalFilesDirs(null)) {
+            val p = d?.path ?: continue
+            val volume = p.substringBefore("/Android/data")
+            if (volume != primary.path && volume.startsWith("/storage/")) add("SD card", "sd:" + File(volume).name, File(volume))
+        }
+        return JSONObject().put("granted", hasDeviceAccess()).put("sdk", android.os.Build.VERSION.SDK_INT).put("roots", roots)
+    }
+
+    private val legacyStorageLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        emit("deviceAccessChanged", deviceStatus())
+    }
+
+    /** Android 11+: sends the user to the "All files access" switch for this app; earlier versions show the normal prompt. */
+    fun requestDeviceAccess() {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            try {
+                startActivity(Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName")))
+            } catch (e: Exception) {
+                startActivity(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            }
+        } else {
+            legacyStorageLauncher.launch(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE))
+        }
+    }
+
+    /** Scans in the background and reports the newest files through 'deviceRecent'. */
+    fun startRecent(rootRel: String, limit: Int) {
+        thread(name = "forge-recent") {
+            try { emit("deviceRecent", store.recent(rootRel, limit.coerceIn(1, 300))) }
+            catch (e: Throwable) { emit("deviceRecent", JSONObject().put("error", e.message ?: "scan failed")) }
+        }
+    }
+
+    private val importManyLauncher = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val dest = pendingImportProject
+        pendingImportProject = null
+        if (uris.isNotEmpty() && dest != null) runAsync("importError") {
+            val dir = store.resolve(dest)
+            val paths = org.json.JSONArray()
+            for (uri in uris) {
+                val name = DocumentFile.fromSingleUri(this, uri)?.name ?: "file"
+                val safe = name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                var target = File(dir, safe)
+                var n = 2
+                while (target.exists()) target = File(dir, "$n-$safe").also { n++ }
+                contentResolver.openInputStream(uri)?.use { ins -> target.outputStream().use { ins.copyTo(it) } } ?: error("Cannot open $name")
+                paths.put("$dest/${target.name}")
+            }
+            emit("filesImported", JSONObject().put("paths", paths))
+        }
+    }
+    fun launchImportMany(destDir: String) { pendingImportProject = destDir; importManyLauncher.launch(arrayOf("*/*")) }
 
     override fun onDestroy() {
         server.stop()

@@ -43,6 +43,9 @@ file system mock. The Kotlin shell has **not been compiled or run on a device ye
 - [ ] Camera / location / microphone permissions in the wrapper (needs runtime-permission handling)
 - Not guaranteed: Play review acceptance (policy, content, Data safety form are on the publisher)
 
+## Device files (added on request)
+- [~] Device file browser: storage roots (internal, Download, Documents, DCIM, Pictures, Movies, Music, SD card), tap a file to open and edit it in place, folders can be opened as projects, sort (newest/oldest modified, name, size, type), type filters, name filter, "Recently modified" tab (bounded scan), new file / new folder / import files, rename / delete / share / open with other app / copy into project. Needs "All files access" (Android 11+) which the app asks for with an explanation. Desktop mock tested; **not tried on a phone**. Note: if this editor is ever published on Google Play, MANAGE_EXTERNAL_STORAGE needs a Play declaration
+
 ## Phase 2 – Preview and tools
 - [~] Live preview: native WebView (no bridge, own origin) serving the project as a site root; auto reload on save; multi-page, ES modules, absolute paths. Done differently from the brief (no Service Worker needed). CI-compiled, **not tried on a phone**
 - [~] Preview modes: split (stacked on phones, side by side ≥760dp), full screen, external browser via loopback server `http://localhost:8080`, device widths 360/412/768. Responsive slider + orientation toggle not yet

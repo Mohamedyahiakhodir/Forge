@@ -93,6 +93,19 @@ class ForgeBridge(private val activity: MainActivity, private val store: FileSto
         activity.runOnUiThread { activity.launchKeyImport(alias, password) }
     }
 
+    // ----- device files -----
+    @JavascriptInterface fun deviceStatus() = reply { activity.deviceStatus() }
+    @JavascriptInterface fun deviceRequest() = reply { activity.runOnUiThread { activity.requestDeviceAccess() } }
+    @JavascriptInterface fun deviceRecent(root: String, limit: Int) = reply { store.resolve(root); activity.startRecent(root, limit) }
+    @JavascriptInterface fun importFilesInto(dir: String) = reply { store.resolve(dir); activity.runOnUiThread { activity.launchImportMany(dir) } }
+    @JavascriptInterface fun shareFile(path: String) = reply {
+        val f = store.resolve(path); require(f.isFile) { "Not a file" }
+        val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.files", f)
+        val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(f.extension.lowercase()) ?: "*/*"
+        val intent = Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        activity.runOnUiThread { activity.startActivity(Intent.createChooser(intent, f.name)) }
+    }
+
     // ----- preview -----
     @JavascriptInterface fun previewOpen(project: String, entry: String) = reply {
         require(store.resolve("$project/$entry").isFile) { "Page not found" }

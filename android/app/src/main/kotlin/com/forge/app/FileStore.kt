@@ -7,13 +7,33 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.regex.Pattern
 
-/** All project files live under [root]. Every path coming from the web layer is project-relative. */
-class FileStore(val root: File) {
+/**
+ * Project files live under [root]; every path from the web layer is project-relative.
+ * A path starting with "@device/" addresses shared storage (/storage/...) and works only while the user
+ * has granted the app "all files access" ([deviceAllowed]).
+ */
+class FileStore(val root: File, private val deviceAllowed: () -> Boolean = { false }) {
+    companion object { const val DEVICE = "@device/" }
+
     init { root.mkdirs() }
 
     private val rootCanonical = root.canonicalPath
 
+    private fun resolveDevice(rest: String): File {
+        require(deviceAllowed()) { "DEVICE_ACCESS_DENIED" }
+        val parts = rest.split('/').filter { it.isNotEmpty() }
+        require(parts.none { it == ".." || it == "." }) { "Invalid path" }
+        val f = File("/" + parts.joinToString("/")).canonicalFile
+        require(f.path.startsWith("/storage/")) { "Path is outside shared storage" }
+        return f
+    }
+
+    /** Storage roots (/storage/emulated/0, /storage/XXXX-XXXX) can be browsed but never deleted or moved. */
+    private fun requireNotStorageRoot(f: File) =
+        require(!Regex("^/storage/[^/]+(/[^/]+)?$").matches(f.path)) { "Cannot change a storage root" }
+
     fun resolve(rel: String): File {
+        if (rel.startsWith(DEVICE)) return resolveDevice(rel.removePrefix(DEVICE))
         val parts = rel.split('/').filter { it.isNotEmpty() }
         require(parts.none { it == ".." || it == "." }) { "Invalid path" }
         val f = File(root, parts.joinToString("/"))
@@ -71,11 +91,46 @@ class FileStore(val root: File) {
     fun remove(rel: String) {
         val f = resolve(rel)
         require(f != root) { "Cannot delete root" }
+        requireNotStorageRoot(f)
         check(f.deleteRecursively()) { "Could not delete" }
+    }
+
+    /**
+     * The most recently modified files under [rootRel] (hidden files and Android/ skipped). Bounded in visited entries and time
+     * so a huge storage cannot hang the app; [truncated] says whether the scan stopped early.
+     */
+    fun recent(rootRel: String, limit: Int, maxVisited: Int = 80_000, timeMs: Long = 5_000): JSONObject {
+        val base = resolve(rootRel)
+        val deadline = System.currentTimeMillis() + timeMs
+        val heap = java.util.PriorityQueue<File>(limit + 1, compareBy { it.lastModified() }) // smallest mtime on top
+        var visited = 0
+        var truncated = false
+        fun walk(dir: File, depth: Int) {
+            if (truncated) return
+            val kids = dir.listFiles() ?: return
+            for (f in kids) {
+                if (++visited > maxVisited || System.currentTimeMillis() > deadline) { truncated = true; return }
+                if (f.name.startsWith(".")) continue
+                if (f.isDirectory) {
+                    if (depth == 0 && f.name == "Android") continue
+                    if (depth < 12) walk(f, depth + 1)
+                } else {
+                    heap.add(f)
+                    if (heap.size > limit) heap.poll()
+                }
+            }
+        }
+        walk(base, 0)
+        val arr = JSONArray()
+        heap.sortedByDescending { it.lastModified() }.forEach {
+            arr.put(JSONObject().put("path", it.path).put("name", it.name).put("size", it.length()).put("mtime", it.lastModified()))
+        }
+        return JSONObject().put("items", arr).put("truncated", truncated)
     }
 
     fun rename(from: String, to: String) {
         val a = resolve(from); val b = resolve(to)
+        requireNotStorageRoot(a)
         require(!b.exists()) { "Target exists" }
         b.parentFile?.mkdirs()
         if (!a.renameTo(b)) { a.copyRecursively(b, overwrite = false); a.deleteRecursively() }

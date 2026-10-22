@@ -16,6 +16,16 @@ declare global {
 
 export const ASSET_ORIGIN = 'https://appassets.androidplatform.net';
 
+/** Paths starting with "@device/" are real locations on shared storage (e.g. "@device/storage/emulated/0/Download/a.html"). */
+export const DEVICE = '@device/';
+export const isDevicePath = (p: string): boolean => p.startsWith(DEVICE);
+export const toDevicePath = (absolute: string): string => DEVICE + absolute.replace(/^\/+/, '');
+export const fromDevicePath = (p: string): string => '/' + p.slice(DEVICE.length);
+
+export interface DeviceRoot { name: string; key: string; path: string }
+export interface DeviceStatus { granted: boolean; sdk: number; roots: DeviceRoot[] }
+export interface RecentItem { path: string; name: string; size: number; mtime: number }
+
 type Listener = (payload: any) => void;
 const listeners = new Map<string, Set<Listener>>();
 export function onNative(name: string, fn: Listener): void {
@@ -66,6 +76,11 @@ export interface Bridge {
   keyExportCert(alias: string): void;
   keyImport(alias: string, password: string): void;
   signAab(inputRel: string, alias: string, password: string, outputRel: string): void;
+  deviceStatus(): DeviceStatus;
+  deviceRequest(): void;
+  deviceRecent(root: string, limit: number): void;
+  importFilesInto(dir: string): void;
+  shareFile(path: string): void;
   previewOpen(project: string, entry: string): void;
   previewReload(): void;
   previewClose(): void;
@@ -111,6 +126,11 @@ const nativeBridge: Bridge = {
   keyExportCert: (a) => native('keyExportCert', a),
   keyImport: (a, p) => native('keyImport', a, p),
   signAab: (i, a, p, o) => native('signAab', i, a, p, o),
+  deviceStatus: () => native('deviceStatus'),
+  deviceRequest: () => native('deviceRequest'),
+  deviceRecent: (r, l) => native('deviceRecent', r, l),
+  importFilesInto: (d) => native('importFilesInto', d),
+  shareFile: (p) => native('shareFile', p),
   previewOpen: (p, e) => native('previewOpen', p, e),
   previewReload: () => native('previewReload'),
   previewClose: () => native('previewClose'),
@@ -122,7 +142,9 @@ const nativeBridge: Bridge = {
   openUrl: (u) => native('openUrl', u),
   saveFileAs: (r, n, m) => native('saveFileAs', r, n, m),
   importFile: (p) => native('importFile', p),
-  assetUrl: (p) => `${ASSET_ORIGIN}/files/${p.split('/').map(encodeURIComponent).join('/')}`,
+  assetUrl: (p) => isDevicePath(p)
+    ? `${ASSET_ORIGIN}/device/${p.slice(DEVICE.length).split('/').map(encodeURIComponent).join('/')}`
+    : `${ASSET_ORIGIN}/files/${p.split('/').map(encodeURIComponent).join('/')}`,
 };
 
 // ---------- in-memory mock (desktop browser dev only) ----------
@@ -208,6 +230,18 @@ const mockBridge: Bridge = {
   keyExportCert() { alert('Needs the Android app'); },
   keyImport() { alert('Needs the Android app'); },
   signAab() { throw new Error('Signing needs the Android app'); },
+  deviceStatus: () => ({ granted: true, sdk: 34, roots: [{ name: 'Internal storage', key: 'internal', path: '/storage/emulated/0' }, { name: 'Download', key: 'download', path: '/storage/emulated/0/Download' }] }),
+  deviceRequest() { /* desktop mock: always granted */ },
+  deviceRecent(root, limit) {
+    const items: RecentItem[] = [];
+    for (const [k, v] of mem) {
+      if (!v.dir && k.startsWith(DEVICE) && (k === root || k.startsWith(root + '/'))) items.push({ path: '/' + k.slice(DEVICE.length), name: k.slice(k.lastIndexOf('/') + 1), size: v.data.length, mtime: v.mtime });
+    }
+    items.sort((a, b) => b.mtime - a.mtime);
+    setTimeout(() => window.__forgeEvent?.('deviceRecent', JSON.stringify({ items: items.slice(0, limit), truncated: false })), 50);
+  },
+  importFilesInto() { alert('Needs the Android app'); },
+  shareFile() { alert('Needs the Android app'); },
   previewOpen: (p, e) => { window.open(mockBridge.assetUrl(`${p}/${e}`), '_blank'); },
   previewReload() { /* desktop mock has no embedded preview */ },
   previewClose() { /* desktop mock has no embedded preview */ },

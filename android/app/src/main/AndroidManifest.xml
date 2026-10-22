@@ -4,9 +4,14 @@
     <!-- No storage permissions: all file access goes through app-private storage and the system file pickers (SAF). -->
     <!-- Internet is used only to talk to api.github.com for cloud builds. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Device file browser: Android 11+ "All files access" (user-granted in Settings); Android 10 and below use the legacy storage permissions. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
     <application
         android:allowBackup="false"
+        android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"

@@ -109,10 +109,12 @@ class Preview(
     fun open(project: String, entryRel: String) {
         this.project = project
         this.entry = entryRel.trimStart('/')
-        loader = WebViewAssetLoader.Builder()
+        val projectDir = store.resolve(project)
+        loader =WebViewAssetLoader.Builder()
             .setDomain(HOST)
             .addPathHandler("/__forge/", WebViewAssetLoader.AssetsPathHandler(ctx))
-            .addPathHandler("/", WebViewAssetLoader.InternalStoragePathHandler(ctx, store.resolve(project)))
+            // A plain directory handler (not InternalStoragePathHandler) so projects on shared storage can be previewed too.
+            .addPathHandler("/") { path -> Mime.serve(projectDir, path) }
             .build()
         view.visibility = View.VISIBLE
         load()
