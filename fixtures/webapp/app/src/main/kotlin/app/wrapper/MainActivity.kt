@@ -27,12 +27,33 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val startUrl = "https://appassets.androidplatform.net/assets/www/index.html"
+        val startUrl = "https://appassets.androidplatform.net/index.html"
         val localMode = true
         val host = Uri.parse(startUrl).host
 
+        // The site root is the packaged www folder, so "/style.css" resolves exactly like in Forge's preview.
         val loader = WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/") { path ->
+                try {
+                    var p = path.trimStart('/')
+                    if (p.isEmpty() || p.endsWith("/")) p += "index.html"
+                    val asset = if (p == "offline.html") "offline.html" else "www/" + p
+                    val ext = p.substringAfterLast('.', "").lowercase()
+                    val mime = when (ext) {
+                        "js", "mjs" -> "text/javascript"
+                        "html", "htm" -> "text/html"
+                        "css" -> "text/css"
+                        "json", "webmanifest" -> "application/json"
+                        "svg" -> "image/svg+xml"
+                        "wasm" -> "application/wasm"
+                        else -> android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+                    }
+                    val text = mime.startsWith("text/") || mime.endsWith("json")
+                    WebResourceResponse(mime, if (text) "utf-8" else null, assets.open(asset))
+                } catch (e: java.io.IOException) {
+                    WebResourceResponse("text/plain", "utf-8", 404, "Not Found", null, java.io.ByteArrayInputStream(ByteArray(0)))
+                }
+            }
             .build()
 
         web = WebView(this).apply {
@@ -55,7 +76,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                    if (request.isForMainFrame) view.loadUrl("https://appassets.androidplatform.net/assets/offline.html")
+                    if (request.isForMainFrame) view.loadUrl("https://appassets.androidplatform.net/offline.html")
                 }
             }
             webChromeClient = object : WebChromeClient() {

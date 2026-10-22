@@ -21,6 +21,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .icon-btn { min-width: 40px; height: 40px; border-radius: 10px; font-size: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
 .icon-btn:active { background: var(--surface2); }
 .icon-btn.dim { opacity: .4; }
+.icon-btn.on { background: var(--accent); color: #fff; }
 .project-btn { font-weight: 600; padding: 8px 10px; border-radius: 10px; max-width: 40vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project-btn:active { background: var(--surface2); }
 .caret { color: var(--muted); font-size: 11px; }

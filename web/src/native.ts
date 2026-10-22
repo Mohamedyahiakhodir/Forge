@@ -66,6 +66,9 @@ export interface Bridge {
   keyExportCert(alias: string): void;
   keyImport(alias: string, password: string): void;
   signAab(inputRel: string, alias: string, password: string, outputRel: string): void;
+  previewOpen(project: string, entry: string): void;
+  previewReload(): void;
+  previewClose(): void;
   keyCheck(alias: string, password: string): boolean;
   ghStatus(): { connected: boolean; login: string };
   ghConnect(token: string): void;
@@ -108,6 +111,9 @@ const nativeBridge: Bridge = {
   keyExportCert: (a) => native('keyExportCert', a),
   keyImport: (a, p) => native('keyImport', a, p),
   signAab: (i, a, p, o) => native('signAab', i, a, p, o),
+  previewOpen: (p, e) => native('previewOpen', p, e),
+  previewReload: () => native('previewReload'),
+  previewClose: () => native('previewClose'),
   keyCheck: (a, p) => native('keyCheck', a, p),
   ghStatus: () => native('ghStatus'),
   ghConnect: (t) => native('ghConnect', t),
@@ -202,6 +208,9 @@ const mockBridge: Bridge = {
   keyExportCert() { alert('Needs the Android app'); },
   keyImport() { alert('Needs the Android app'); },
   signAab() { throw new Error('Signing needs the Android app'); },
+  previewOpen: (p, e) => { window.open(mockBridge.assetUrl(`${p}/${e}`), '_blank'); },
+  previewReload() { /* desktop mock has no embedded preview */ },
+  previewClose() { /* desktop mock has no embedded preview */ },
   keyCheck: () => true,
   ghStatus: () => ({ connected: false, login: '' }),
   ghConnect() { throw new Error('Needs the Android app'); },

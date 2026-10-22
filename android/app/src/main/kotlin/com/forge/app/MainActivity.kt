@@ -178,10 +178,22 @@ class MainActivity : AppCompatActivity() {
             addJavascriptInterface(ForgeBridge(this@MainActivity, store), "ForgeNative")
         }
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
-        setContentView(web)
+        preview = Preview(
+            this, store,
+            onConsole = { level, msg, src -> emit("previewConsole", JSONObject().put("level", level).put("msg", msg).put("src", src)) },
+            onClosed = { emit("previewClosed", JSONObject()); applySplit() },
+            onOpenExternal = { entry -> openInBrowser(entry) },
+            onFullscreen = { web.visibility = if (it) View.GONE else View.VISIBLE },
+        )
+        root = android.widget.LinearLayout(this)
+        root.addView(web)
+        root.addView(preview.view)
+        applySplit()
+        setContentView(root)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (preview.isOpen) { if (preview.isFullscreen) preview.exitFullscreen() else preview.close(); return }
                 web.evaluateJavascript("(window.__forgeBack && window.__forgeBack()) === true") { handled ->
                     if (handled != "true") { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
                 }
@@ -203,9 +215,41 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        server.stop()
+        preview.destroy()
         web.removeJavascriptInterface("ForgeNative")
         web.destroy()
         super.onDestroy()
+    }
+
+    // ----- live preview (separate WebView without the native bridge) -----
+    lateinit var preview: Preview
+    private lateinit var root: android.widget.LinearLayout
+    private val server = LocalServer()
+
+    /** Editor and preview share the screen: side by side on wide screens, stacked on phones. */
+    private fun applySplit() {
+        val wide = resources.configuration.screenWidthDp >= 760
+        root.orientation = if (wide) android.widget.LinearLayout.HORIZONTAL else android.widget.LinearLayout.VERTICAL
+        fun lp() = if (wide) android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        else android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        web.layoutParams = lp()
+        preview.view.layoutParams = lp()
+    }
+
+    fun previewOpen(project: String, entry: String) { preview.open(project, entry); applySplit() }
+
+    /** Opens the project in the phone's real browser through the loopback server (e.g. for Google sign-in). */
+    private fun openInBrowser(entry: String) {
+        try {
+            server.start(store.resolve(preview.currentProject()))
+            val url = "http://localhost:${LocalServer.DEFAULT_PORT}/" + entry.split('/').joinToString("/") { Uri.encode(it) }
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: java.net.BindException) {
+            emit("previewConsole", JSONObject().put("level", "error").put("msg", "PORT_BUSY").put("src", ""))
+        } catch (e: Exception) {
+            emit("previewConsole", JSONObject().put("level", "error").put("msg", e.message ?: "Could not open the browser").put("src", ""))
+        }
     }
 
     // ----- launched from ForgeBridge on the UI thread -----

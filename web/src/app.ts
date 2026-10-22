@@ -239,6 +239,31 @@ function tabMenu(i: number): void {
   ]);
 }
 
+// ---------- preview ----------
+let previewOpen = false;
+const reloadPreview = debounce(() => { try { bridge.previewReload(); } catch { /* preview closed */ } }, 250);
+
+function findEntryHtml(): string {
+  const cur = tabs[active]?.path;
+  if (cur && project && cur.startsWith(project + '/') && /\.html?$/i.test(cur)) return cur.slice(project.length + 1);
+  if (project && bridge.stat(`${project}/index.html`).exists) return 'index.html';
+  try { const first = bridge.list(project).find((e) => !e.isDir && /\.html?$/i.test(e.name)); return first ? first.name : ''; } catch { return ''; }
+}
+
+function togglePreview(): void {
+  if (!project) return;
+  if (previewOpen) { try { bridge.previewClose(); } catch { /* ignore */ } previewOpen = false; $('preview-btn').classList.remove('on'); return; }
+  const entry = findEntryHtml();
+  if (!entry) { toast(t('noHtml')); return; }
+  manualSave(true);
+  try {
+    bridge.previewOpen(project, entry);
+    previewOpen = true;
+    $('preview-btn').classList.add('on');
+    closeDrawer();
+  } catch (e: any) { toast(String(e.message ?? e)); }
+}
+
 // ---------- saving ----------
 function saveTab(tab: Tab): boolean {
   if (tab.kind !== 'text' || tab.readOnly) return true;
@@ -246,6 +271,7 @@ function saveTab(tab: Tab): boolean {
   try {
     bridge.writeText(tab.path, state.doc.toString());
     tab.dirty = false;
+    if (previewOpen) reloadPreview();
     return true;
   } catch (e: any) {
     toast(t('saveFailed', e.message ?? e));
@@ -691,6 +717,7 @@ export async function boot(): Promise<void> {
   $('more-btn').onclick = editorMenu;
   $('settings-btn').onclick = () => openSettings(project, relabelStatic);
   $('find-btn').onclick = () => { if (tabs[active]?.kind === 'text') ed.commands.find(); };
+  $('preview-btn').onclick = togglePreview;
   $('new-file-btn').onclick = () => { if (project) void newItem(project, false); };
   $('new-folder-btn').onclick = () => { if (project) void newItem(project, true); };
   $('hidden-btn').onclick = () => { update({ showHidden: !effective().showHidden }); };
@@ -719,6 +746,12 @@ export async function boot(): Promise<void> {
   onNative('importDone', (p: { project: string }) => { toast(t('importDone', p.project)); void openProject(p.project); });
   onNative('importError', (p: { message: string }) => toast(t('importFailed', p.message)));
   onNative('exportDone', () => toast(t('exportDone')));
+  onNative('previewConsole', (p: { level: 'info' | 'warn' | 'error'; msg: string; src: string }) => {
+    if (p.msg === 'PORT_BUSY') { toast(L('البورت 8080 مشغول. اقفل أي سيرفر تاني وحاول.', 'Port 8080 is busy. Close any other server and retry.')); return; }
+    log(p.level, `[preview] ${p.msg}${p.src ? `  (${p.src})` : ''}`);
+    if (p.level === 'error') { setPanel('console'); }
+  });
+  onNative('previewClosed', () => { previewOpen = false; $('preview-btn').classList.remove('on'); });
   window.__forgeBack = () => {
     if (document.querySelector('.overlay')) { document.querySelector('.overlay:last-of-type')?.remove(); return true; }
     if (document.body.classList.contains('drawer')) { closeDrawer(); return true; }

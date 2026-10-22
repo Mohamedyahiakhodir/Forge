@@ -41,6 +41,7 @@ const en: Dict = {
   copied: 'Copied', error: 'Error', back: 'Back', pickDest: 'Choose destination', here: 'Select this folder', root: 'Project root',
   welcomeTitle: 'Welcome to Forge', welcomeBody: 'A code editor for your phone. Create your first project to begin.',
   startProject: 'Create a project',
+  preview: 'Preview', noHtml: 'Add an HTML file (e.g. index.html) to preview the project.',
 };
 
 const ar: Dict = {
@@ -82,6 +83,7 @@ const ar: Dict = {
   copied: 'اتنسخ', error: 'خطأ', back: 'رجوع', pickDest: 'اختار الوجهة', here: 'اختار المجلد ده', root: 'جذر المشروع',
   welcomeTitle: 'أهلًا في Forge', welcomeBody: 'محرر كود على موبايلك. اعمل أول مشروع علشان تبدأ.',
   startProject: 'إنشاء مشروع',
+  preview: 'معاينة', noHtml: 'ضيف ملف HTML (مثلًا index.html) علشان تعاين المشروع.',
 };
 
 export function t(key: string, ...args: (string | number)[]): string {

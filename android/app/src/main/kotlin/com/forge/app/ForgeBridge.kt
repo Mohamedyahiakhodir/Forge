@@ -93,6 +93,14 @@ class ForgeBridge(private val activity: MainActivity, private val store: FileSto
         activity.runOnUiThread { activity.launchKeyImport(alias, password) }
     }
 
+    // ----- preview -----
+    @JavascriptInterface fun previewOpen(project: String, entry: String) = reply {
+        require(store.resolve("$project/$entry").isFile) { "Page not found" }
+        activity.runOnUiThread { activity.previewOpen(project, entry) }
+    }
+    @JavascriptInterface fun previewReload() = reply { activity.runOnUiThread { activity.preview.reload() } }
+    @JavascriptInterface fun previewClose() = reply { activity.runOnUiThread { if (activity.preview.isOpen) activity.preview.close() } }
+
     /** Fails fast (before a 5-minute cloud build) if the key password is wrong. */
     @JavascriptInterface fun keyCheck(alias: String, password: String) = reply {
         try { com.forge.app.sign.KeyTools.load(activity.vault.p12(alias), password.toCharArray()); true }

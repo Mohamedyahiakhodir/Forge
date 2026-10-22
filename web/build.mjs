@@ -39,6 +39,10 @@ await build({
 copyFileSync(resolve(here, 'src/index.html'), resolve(out, 'index.html'));
 copyFileSync(resolve(here, 'src/style.css'), resolve(out, 'style.css'));
 
+// DevTools injected into the preview page on demand (served to the preview WebView only).
+const eruda = resolve(here, 'node_modules/eruda/eruda.js');
+if (existsSync(eruda)) copyFileSync(eruda, resolve(out, 'eruda.js'));
+
 mkdirSync(resolve(out, 'fonts'), { recursive: true });
 const fontFiles = [
   ['@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2', 'jetbrains-mono.woff2'],
