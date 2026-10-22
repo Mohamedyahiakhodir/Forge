@@ -183,7 +183,7 @@ export async function runPreflight(project: string, c: PublishConfig): Promise<C
     }
   }
   const sensitive: [boolean, string, string][] = [
-    [c.camera, 'الكاميرا', 'camera'], [c.microphone, 'الميكروفون', 'microphone'], [c.location, 'الموقع', 'location'], [c.notifications, 'الإشعارات', 'notifications'],
+    [c.camera, 'الكاميرا', 'camera'], [c.microphone, 'الميكروفون', 'microphone'], [c.location, 'الموقع', 'location'], [c.notifications || c.push, 'الإشعارات', 'notifications'],
   ];
   const on = sensitive.filter((s) => s[0]);
   if (on.length) {
@@ -196,6 +196,26 @@ export async function runPreflight(project: string, c: PublishConfig): Promise<C
   }
   if ((c.camera || c.microphone || c.location || c.notifications) && c.source === 'url' && !c.internet) {
     r.push(err(L('الصلاحيات دي محتاجة الإنترنت', 'These permissions need the Internet permission'), L('فعّل خيار الإنترنت.', 'Enable the Internet option.')));
+  }
+  if (c.push) {
+    if (!bridge.stat(gsPath).exists) {
+      r.push(err(L('الإشعارات البعيدة (FCM) محتاجة google-services.json', 'Push notifications (FCM) need google-services.json'),
+        L('اعمل مشروع Firebase وضيف تطبيق أندرويد باسم الحزمة بتاعك، ونزّل google-services.json والصقه في "الملفات والبصمات".', 'Create a Firebase project, add an Android app with your package id, download google-services.json and paste it in "Files and fingerprints".')));
+    }
+    r.push(warn(L('الإشعارات البعيدة محتاجة سيرفر يبعت', 'Push needs a server to send messages'),
+      L('التطبيق بيستقبل الإشعارات، لكن لازم تبعتها من Firebase Console (Messaging) أو من سيرفرك بـ FCM HTTP v1. خد الـtoken من Forge.pushToken() واحفظه عندك.',
+        'The app receives pushes, but you must send them from Firebase Console (Messaging) or your server via FCM HTTP v1. Get the token from Forge.pushToken() and store it on your side.')));
+  }
+  if (c.oauth) {
+    const scheme = c.oauthScheme.trim();
+    if (!/^[a-z][a-z0-9+.-]{2,60}$/.test(scheme) || ['http', 'https', 'file', 'content', 'intent', 'javascript', 'data', 'tel', 'mailto', 'sms'].includes(scheme)) {
+      r.push(err(L('الـscheme بتاع تسجيل الدخول غير صالح', 'OAuth redirect scheme is invalid'),
+        L('استخدم حروف إنجليزية صغيرة وأرقام ونقط، مثال: com.ahmed.shop. ومينفعش يبقى http أو https أو غيرهم من المحجوزة.', 'Use lowercase letters, digits and dots, e.g. com.ahmed.shop. It cannot be http, https or other reserved schemes.')));
+    } else {
+      r.push(ok(L(`رابط الرجوع (redirect URI) = ${scheme}://oauth`, `Redirect URI = ${scheme}://oauth`)));
+      r.push(warn(L('سجّل رابط الرجوع عند مزوّد تسجيل الدخول', 'Register the redirect URI with your provider'),
+        L(`في إعدادات التطبيق عند المزوّد (GitHub / Facebook / Microsoft...) أضف ${scheme}://oauth كـ redirect URI، وفي كودك استخدم Forge.redirectUri.`, `In your provider's app settings (GitHub / Facebook / Microsoft...) add ${scheme}://oauth as a redirect URI and use Forge.redirectUri in your code.`)));
+    }
   }
   if (c.googleSignIn) {
     if (!c.googleClientId.trim()) {

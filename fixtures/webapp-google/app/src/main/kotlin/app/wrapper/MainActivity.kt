@@ -133,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         }
         // Native capabilities for the page (window.Forge). Locked to the app's own origin and the main frame.
         ForgeBridge.install(this, web, setOf(if (localMode) "https://appassets.androidplatform.net" else "https://" + host))
+        ForgeBridge.ensureChannel(this)
         setContentView(web)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -148,6 +149,14 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
     }
+
+    override fun onStart() { super.onStart(); ForgeBridge.foreground = true }
+    override fun onStop() { ForgeBridge.foreground = false; super.onStop() }
+
+    // The OAuth redirect (custom scheme) arrives here because the activity is singleTask.
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); ForgeBridge.onNewIntent(intent) }
+    override fun onPause() { ForgeBridge.onPause(); super.onPause() }
+    override fun onResume() { super.onResume(); ForgeBridge.onResume(this) }
 
     override fun onDestroy() {
         web.destroy()

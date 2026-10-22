@@ -57,7 +57,7 @@ export function openPublish(project: string): void {
   };
   const check = <K extends keyof PublishConfig>(label: string, key: K) => {
     const i = h('input', { type: 'checkbox', class: 'switch', checked: !!cfg[key] });
-    i.addEventListener('change', () => { (cfg as any)[key] = i.checked; save(); });
+    i.addEventListener('change', () => { (cfg as any)[key] = i.checked; if (key === 'oauth') render(); save(); });
     body.append(h('label', { class: 'set-row' }, h('span', {}, label), i));
   };
   const section = (t: string) => body.append(h('div', { class: 'set-section' }, t));
@@ -96,7 +96,12 @@ export function openPublish(project: string): void {
     check(L('الكاميرا (getUserMedia)', 'Camera (getUserMedia)'), 'camera');
     check(L('الميكروفون (getUserMedia)', 'Microphone (getUserMedia)'), 'microphone');
     check(L('الموقع (navigator.geolocation)', 'Location (navigator.geolocation)'), 'location');
-    check(L('الإشعارات (Forge.notify)', 'Notifications (Forge.notify)'), 'notifications');
+    check(L('الإشعارات المحلية (Forge.notify)', 'Local notifications (Forge.notify)'), 'notifications');
+    check(L('الإشعارات البعيدة FCM (محتاجة Firebase)', 'Remote push FCM (needs Firebase)'), 'push');
+    section(L('قدرات إضافية', 'More capabilities'));
+    check(L('مشاركة + فتح الاتصال والرسائل والروابط + النسخ', 'Share + open dialer/SMS/links + copy'), 'nativeActions');
+    check(L('تسجيل دخول OAuth لأي مزوّد (Custom Tabs)', 'OAuth sign-in for any provider (Custom Tabs)'), 'oauth');
+    if (cfg.oauth) field(L('الـscheme بتاع رابط الرجوع', 'Redirect URI scheme'), 'oauthScheme', { hint: L(`رابط الرجوع هيبقى: ${cfg.oauthScheme}://oauth`, `Redirect URI will be: ${cfg.oauthScheme}://oauth`) });
     body.append(h('div', { class: 'sub pub-note' }, L(
       'فعّل اللي موقعك بيستخدمه فعلًا بس. كود الصفحة العادي (getUserMedia وgeolocation) بيشتغل زي الموقع، والتطبيق بيسأل المستخدم بنافذة أندرويد. للإشعارات والتحكم في طلب الإذن استخدم Forge.notify وForge.requestPermission. كل إذن بتفعّله لازم تشرحه في نموذج Data safety في Google Play.',
       'Enable only what your site really uses. Normal page code (getUserMedia, geolocation) works as on the web and the app shows the Android permission prompt. For notifications and explicit permission requests use Forge.notify and Forge.requestPermission. Every permission you enable must be explained in the Google Play Data safety form.')));

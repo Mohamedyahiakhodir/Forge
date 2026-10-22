@@ -24,6 +24,10 @@ export interface PublishConfig {
   microphone: boolean;
   location: boolean;
   notifications: boolean;
+  push: boolean;
+  nativeActions: boolean;
+  oauth: boolean;
+  oauthScheme: string;
   googleClientId: string;
   googleSignIn: boolean;
   playSha1: string;
@@ -51,6 +55,10 @@ export function defaults(project: string): PublishConfig {
     microphone: false,
     location: false,
     notifications: false,
+    push: false,
+    nativeActions: true,
+    oauth: false,
+    oauthScheme: `com.yourname.${slug(project)}`,
     googleClientId: '',
     googleSignIn: false,
     playSha1: '',

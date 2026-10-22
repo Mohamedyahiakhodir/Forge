@@ -1,7 +1,7 @@
 import { bridge } from '../native';
 import { joinPath } from '../ui';
 import { TARGET_SDK, type PublishConfig } from './config';
-import { forgeBridgeKt, needsBridge } from './bridge-kt';
+import { forgeBridgeKt, messagingServiceKt, needsBridge, notifOn } from './bridge-kt';
 
 const xmlEsc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, "\\'");
 const ktEsc = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$');
@@ -19,8 +19,27 @@ function manifest(c: PublishConfig): string {
     c.camera ? [use('CAMERA'), feature('android.hardware.camera'), feature('android.hardware.camera.autofocus')].join('\n') : '',
     c.microphone ? [use('RECORD_AUDIO'), use('MODIFY_AUDIO_SETTINGS'), feature('android.hardware.microphone')].join('\n') : '',
     c.location ? [use('ACCESS_FINE_LOCATION'), use('ACCESS_COARSE_LOCATION'), feature('android.hardware.location'), feature('android.hardware.location.gps')].join('\n') : '',
-    c.notifications ? use('POST_NOTIFICATIONS') : '',
+    notifOn(c) ? use('POST_NOTIFICATIONS') : '',
   ].filter(Boolean).join('\n');
+  const launchMode = c.oauth ? '\n            android:launchMode="singleTask"' : '';
+  const oauthFilter = c.oauth ? `
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${c.oauthScheme.trim()}" />
+            </intent-filter>` : '';
+  const pushService = c.push ? `
+        <service
+            android:name="app.wrapper.ForgeMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="default" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_notify" />
+` : '';
   return `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -38,13 +57,14 @@ ${perms}
         <activity
             android:name="app.wrapper.MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|smallestScreenSize|screenLayout|uiMode|density|layoutDirection"
-            android:exported="true"${orient}
+            android:exported="true"${orient}${launchMode}
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            </intent-filter>${oauthFilter}
         </activity>
+${pushService}
     </application>
 </manifest>
 `;
@@ -188,6 +208,7 @@ ${c.camera || c.microphone ? `
         }
 ${needsBridge(c) ? `        // Native capabilities for the page (window.Forge). Locked to the app's own origin and the main frame.
         ForgeBridge.install(this, web, setOf(if (localMode) "https://appassets.androidplatform.net" else "https://" + host))
+` : ''}${notifOn(c) ? `        ForgeBridge.ensureChannel(this)
 ` : ''}        setContentView(web)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -204,6 +225,14 @@ ${needsBridge(c) ? `        // Native capabilities for the page (window.Forge). 
         web.saveState(outState)
     }
 
+${needsBridge(c) ? `    override fun onStart() { super.onStart(); ForgeBridge.foreground = true }
+    override fun onStop() { ForgeBridge.foreground = false; super.onStop() }
+` : ''}${c.oauth ? `
+    // The OAuth redirect (custom scheme) arrives here because the activity is singleTask.
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); ForgeBridge.onNewIntent(intent) }
+    override fun onPause() { ForgeBridge.onPause(); super.onPause() }
+    override fun onResume() { super.onResume(); ForgeBridge.onResume(this) }
+` : ''}
     override fun onDestroy() {
         web.destroy()
         super.onDestroy()
@@ -332,14 +361,20 @@ dependencies {
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")` : ''}
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")` : ''}${c.oauth ? `
+    implementation("androidx.browser:browser:1.8.0")` : ''}${c.push ? `
+    implementation("com.google.firebase:firebase-messaging:24.1.0")` : ''}
 }
 `);
   put('app/src/main/AndroidManifest.xml', manifest(c));
   if (c.googleSignIn && !c.googleClientId.trim()) throw new Error('Google sign-in needs a Web Client ID');
   put('app/src/main/kotlin/app/wrapper/MainActivity.kt', mainActivity(c));
   if (needsBridge(c)) put('app/src/main/kotlin/app/wrapper/ForgeBridge.kt', forgeBridgeKt(c));
-  if (c.notifications) {
+  if (c.push) {
+    if (!hasGs) throw new Error('Push notifications need google-services.json');
+    put('app/src/main/kotlin/app/wrapper/ForgeMessagingService.kt', messagingServiceKt());
+  }
+  if (notifOn(c)) {
     put('app/src/main/res/drawable/ic_stat_notify.xml', `<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
