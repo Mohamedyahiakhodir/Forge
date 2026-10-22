@@ -41,9 +41,9 @@ file system mock. The Kotlin shell has **not been compiled or run on a device ye
 - Not guaranteed: Play review acceptance (policy, content, Data safety form are on the publisher)
 
 ## Phase 2 – Preview and tools
-- [ ] Live preview via Service Worker + virtual FS, auto reload, multi-page, ES modules
-- [ ] Preview modes: split, full screen, external browser, device frames, responsive slider
-- [ ] Eruda in preview; console/errors in bottom panel
+- [~] Live preview: native WebView (no bridge, own origin) serving the project as a site root; auto reload on save; multi-page, ES modules, absolute paths. Done differently from the brief (no Service Worker needed). CI-compiled, **not tried on a phone**
+- [~] Preview modes: split (stacked on phones, side by side ≥760dp), full screen, external browser via loopback server `http://localhost:8080`, device widths 360/412/768. Responsive slider + orientation toggle not yet
+- [~] Eruda toggle in preview; console/errors forwarded to the bottom panel
 - [ ] Markdown preview, JSON viewer/formatter, image & SVG preview
 - [ ] Run JS/TS in sandboxed Worker
 - [ ] Prettier, ESLint, TypeScript diagnostics + JS/TS completion worker, inline PDF viewer
