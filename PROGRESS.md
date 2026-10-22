@@ -1,0 +1,63 @@
+# Forge – progress
+
+Legend: `[x]` done · `[~]` partial (reason given) · `[ ]` todo · `[!]` blocked (reason given)
+
+**Verification note.** Phase 1 web code is type-checked, bundled and was exercised in a desktop browser with the in-memory
+file system mock. The Kotlin shell has **not been compiled or run on a device yet**; the first GitHub Actions run is its first compile.
+
+## Phase 1 – Editor core
+- [x] App shell: top bar, sidebar (file tree), tab bar, editor, bottom panel (console / terminal / search), status bar
+- [~] Status bar: line:col, language, encoding (always UTF-8, no detection), Git branch (reads `.git/HEAD` only until Phase 3)
+- [x] Languages: HTML, CSS, JS, TS, JSON, Markdown, XML, YAML, Python, PHP, SQL, Java, Kotlin, C/C++, Go, Rust, Dart, shell (lazy-loaded)
+- [x] Auto-indent, bracket matching/auto-close, multi-cursor (menu + rectangular/crosshair), folding, line numbers, word-wrap toggle, undo/redo
+- [x] Find/replace (regex, case, whole word), go to line, comment toggle, move/duplicate line, select next occurrence
+- [~] Minimap: off by default, setting wired to `@replit/codemirror-minimap`; not verified on device
+- [~] Autocomplete: HTML tags/attrs, CSS props, JS/TS keywords + built-in snippets. **JS/TS worker completion (type-aware) moves to Phase 2** with the TypeScript worker
+- [x] Emmet expansion (Tab in HTML/CSS, or menu)
+- [x] Snippets (built-in set; user snippets not yet)
+- [~] Lint markers: JSON parse errors + JavaScript syntax errors (acorn, Web Worker). ESLint → Phase 2
+- [x] Pinch-to-zoom font size
+- [x] 28 themes incl. Dracula, Monokai, One Dark, Solarized, GitHub (light + dark)
+- [x] Keyboard helper bar (Tab, symbols, arrows, Home/End, undo/redo) + customizable second row
+- [~] Arabic input / RTL: per-line text direction, `dir` toggle, IME left to CodeMirror; **needs on-device testing**
+- [x] File manager: create / rename / delete / move / copy / duplicate, multi-select, long-press menu, icons, hidden toggle
+- [~] Drag and drop: HTML5 DnD on tree rows; touch alternative is "Move to…" in the long-press menu. Not verified on device
+- [x] Viewers: image / video / audio; binary detection; large files (>5 MB open as first 512 KB read-only, "Open fully" button); recents; favorites
+- [~] PDF: opens in the system viewer (WebView cannot render PDFs). Inline pdf.js viewer → Phase 2
+- [x] Virtualized lazy file tree (renders only visible rows; children read on expand)
+- [x] Project manager: templates (blank, HTML5, Bootstrap, Tailwind, React CDN, Vue CDN, Node/Express, PWA), delete, per-project `.forge/settings.json`
+- [~] Open from device folder: **imports a copy** via SAF and can export back to a chosen folder; no live-linked folder (see "Limits")
+- [~] ZIP import/export: done natively with `java.util.zip` instead of JSZip (faster, no base64 round trip for big projects)
+- [x] Global search/replace: regex, include/exclude globs, preview before applying (native search)
+- [x] Session restore: tabs, cursor, scroll, unsaved content; autosave with configurable delay
+- [~] Settings: font, size, tab size, tabs/spaces, theme, key bindings (default/Vim), line height, RTL, auto-close tags, UI language AR/EN done. **Format on save is a stored switch only until Prettier (Phase 2)**
+
+## Phase 2 – Preview and tools
+- [ ] Live preview via Service Worker + virtual FS, auto reload, multi-page, ES modules
+- [ ] Preview modes: split, full screen, external browser, device frames, responsive slider
+- [ ] Eruda in preview; console/errors in bottom panel
+- [ ] Markdown preview, JSON viewer/formatter, image & SVG preview
+- [ ] Run JS/TS in sandboxed Worker
+- [ ] Prettier, ESLint, TypeScript diagnostics + JS/TS completion worker, inline PDF viewer
+
+## Phase 3 – Git and remotes
+- [ ] isomorphic-git: init, clone, status, stage, commit, diff, branches, merge, pull, push, fetch, remotes, stash, log, revert, conflicts
+- [ ] Auth (PAT, GitHub device flow), native HTTP bridge for CORS, GitHub repos/Actions UI
+
+## Phase 4 – Remote and terminal
+- [ ] Terminal with file commands, `node` via QuickJS, npm-lite
+- [ ] SFTP/FTP/FTPS, SSH terminal, remote project mounting
+- [!] Full Node.js in-app is not possible on Android without shipping a native Node runtime; plan is QuickJS + connector to a remote Node/SSH server
+
+## Phase 5 – Builder
+- [ ] Declarative UI API + docs/forge-ui.md · QuickJS runtime · hot reload · chat-to-app · auto-fix loop
+- [ ] On-device APK build (template + apksig) · install flow · cloud build fallback · icon/splash generator
+
+## Phase 6 – Polish
+- [ ] Performance at 5,000 files (tree already virtualized) · offline-first audit · crash log screen export (basic log panel exists)
+- [ ] Onboarding/empty states (basic ones exist) · accessibility + tablet layouts (sidebar becomes persistent ≥760 px)
+- [ ] Backup/restore ZIP · security review of permissions
+
+## Limits worth knowing
+- A folder opened through Android's system picker cannot be edited live with plain `java.io.File` (Android 11+ scoped storage). Forge copies it into its own storage; changes go back with "Export to device folder". A live SAF-backed mount is possible but slow per-file; decide after you test the copy flow.
+- Android always shows one confirmation tap for APK installs (Phase 5).

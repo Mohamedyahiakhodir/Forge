@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-dark="1">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Forge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <button id="menu-btn" class="icon-btn" data-i18n-title="files">☰</button>
+      <button id="project-btn" class="project-btn"><span id="project-name"></span> <span class="caret">▾</span></button>
+      <span class="spacer"></span>
+      <button id="find-btn" class="icon-btn" data-i18n-title="findReplace">🔎</button>
+      <button id="search-btn" class="icon-btn" data-i18n-title="searchProject">🗂</button>
+      <button id="save-btn" class="icon-btn dim" data-i18n-title="save">💾</button>
+      <button id="more-btn" class="icon-btn" data-i18n-title="more">⋮</button>
+      <button id="settings-btn" class="icon-btn" data-i18n-title="settings">⚙</button>
+    </header>
+
+    <div id="body">
+      <div id="scrim"></div>
+      <aside id="sidebar">
+        <div id="side-tabs" class="seg">
+          <button data-mode="files" class="on" data-i18n="files"></button>
+          <button data-mode="recent" data-i18n="recent"></button>
+          <button data-mode="favs" data-i18n="favorites"></button>
+        </div>
+        <div class="side-tools">
+          <button id="new-file-btn" class="icon-btn" data-i18n-title="newFile">📄＋</button>
+          <button id="new-folder-btn" class="icon-btn" data-i18n-title="newFolder">📁＋</button>
+          <button id="select-btn" class="icon-btn" data-i18n-title="selectMode">☑</button>
+          <button id="hidden-btn" class="icon-btn" data-i18n-title="showHidden">👁</button>
+        </div>
+        <div id="side-selectbar" style="display:none">
+          <span id="sel-count"></span>
+          <button id="sel-move" class="btn small" data-i18n="move"></button>
+          <button id="sel-copy" class="btn small" data-i18n="copy"></button>
+          <button id="sel-delete" class="btn small danger" data-i18n="delete"></button>
+          <button id="sel-done" class="btn small" data-i18n="close"></button>
+        </div>
+        <div id="tree-host"></div>
+        <div id="side-list" style="display:none"></div>
+      </aside>
+
+      <main id="main">
+        <div id="tabs" role="tablist"></div>
+        <div id="banner" style="display:none"></div>
+        <div id="editor-area">
+          <div id="cm"></div>
+          <div id="viewer" style="display:none"></div>
+          <div id="empty-editor">
+            <div class="big">⌨️</div>
+            <div class="et" data-i18n="emptyEditor"></div>
+            <div class="sub" data-i18n="emptyEditorSub"></div>
+            <button id="empty-new" class="btn primary" data-i18n="startProject"></button>
+          </div>
+        </div>
+        <div id="keybar-host"></div>
+        <section id="panel" style="display:none">
+          <div id="panel-head">
+            <div id="panel-tabs" class="seg">
+              <button data-mode="console" class="on" data-i18n="console"></button>
+              <button data-mode="terminal" data-i18n="terminal"></button>
+              <button data-mode="search" data-i18n="search"></button>
+            </div>
+            <button id="console-clear" class="icon-btn" data-i18n-title="clear">🧹</button>
+            <button id="panel-close" class="icon-btn" data-i18n-title="close">✕</button>
+          </div>
+          <div id="console-pane"><div id="console-out"></div></div>
+          <div id="terminal-pane" style="display:none"></div>
+          <div id="search-pane" style="display:none"></div>
+        </section>
+      </main>
+    </div>
+
+    <footer id="status"></footer>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

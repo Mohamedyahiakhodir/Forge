@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="forge_bg">#1E1F29</color>
+    <color name="forge_bar">#282A36</color>
+    <color name="ic_bg">#282A36</color>
+    <color name="ic_fg">#4F9CFF</color>
+</resources>
