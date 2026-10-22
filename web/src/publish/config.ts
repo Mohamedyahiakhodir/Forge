@@ -20,6 +20,10 @@ export interface PublishConfig {
   privacyUrl: string;
   internet: boolean;
   vibrate: boolean;
+  camera: boolean;
+  microphone: boolean;
+  location: boolean;
+  notifications: boolean;
   googleClientId: string;
   googleSignIn: boolean;
   playSha1: string;
@@ -43,6 +47,10 @@ export function defaults(project: string): PublishConfig {
     privacyUrl: '',
     internet: true,
     vibrate: false,
+    camera: false,
+    microphone: false,
+    location: false,
+    notifications: false,
     googleClientId: '',
     googleSignIn: false,
     playSha1: '',

@@ -182,6 +182,21 @@ export async function runPreflight(project: string, c: PublishConfig): Promise<C
       r.push(err(L('ملف google-services.json تالف', 'google-services.json is corrupt'), L('نزّله من Firebase تاني وارفعه من جديد.', 'Download it from Firebase again and re-upload.')));
     }
   }
+  const sensitive: [boolean, string, string][] = [
+    [c.camera, 'الكاميرا', 'camera'], [c.microphone, 'الميكروفون', 'microphone'], [c.location, 'الموقع', 'location'], [c.notifications, 'الإشعارات', 'notifications'],
+  ];
+  const on = sensitive.filter((s) => s[0]);
+  if (on.length) {
+    r.push(warn(L(`صلاحيات حسّاسة مفعّلة: ${on.map((s) => s[1]).join('، ')}`, `Sensitive permissions enabled: ${on.map((s) => s[2]).join(', ')}`),
+      L('Google Play بيطلب منك: (1) تصريح في نموذج Data safety بإيه البيانات اللي بتجمعها، (2) سياسة خصوصية بتذكرها، (3) استخدام حقيقي لها داخل التطبيق. لو مش بتستخدمها فعلًا ألغِ تفعيلها لأن ده من أشهر أسباب الرفض.',
+        'Google Play requires: (1) Data safety disclosures for what you collect, (2) a privacy policy that mentions it, (3) real use inside the app. If you do not actually use a permission, turn it off; unused permissions are a common rejection reason.')));
+    if (!/^https:\/\//i.test(c.privacyUrl.trim())) {
+      r.push(err(L('الصلاحيات الحسّاسة تتطلب رابط سياسة خصوصية', 'Sensitive permissions require a privacy policy URL'), L('أضف رابط سياسة الخصوصية (https) في قسم الخصوصية.', 'Add your privacy policy URL (https) in the Privacy section.')));
+    }
+  }
+  if ((c.camera || c.microphone || c.location || c.notifications) && c.source === 'url' && !c.internet) {
+    r.push(err(L('الصلاحيات دي محتاجة الإنترنت', 'These permissions need the Internet permission'), L('فعّل خيار الإنترنت.', 'Enable the Internet option.')));
+  }
   if (c.googleSignIn) {
     if (!c.googleClientId.trim()) {
       r.push(err(L('تسجيل الدخول بجوجل مفعّل من غير Client ID', 'Google sign-in is on but there is no Client ID'),

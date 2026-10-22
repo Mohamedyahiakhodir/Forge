@@ -19,6 +19,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
 
+    private var pendingPermissions: ((Map<String, Boolean>) -> Unit)? = null
+    private val permissionLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        val cb = pendingPermissions
+        pendingPermissions = null
+        cb?.invoke(result)
+    }
+
+    /** Asks for runtime permissions (one request at a time) and reports whether the needed ones are granted. */
+    fun ensurePermissions(perms: List<String>, requireAll: Boolean = true, done: (Boolean) -> Unit) {
+        fun has(p: String) = androidx.core.content.ContextCompat.checkSelfPermission(this, p) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        fun granted() = if (requireAll) perms.all { has(it) } else perms.any { has(it) }
+        if (perms.isEmpty() || granted()) { done(true); return }
+        pendingPermissions?.invoke(emptyMap())
+        pendingPermissions = { done(granted()) }
+        permissionLauncher.launch(perms.filter { !has(it) }.toTypedArray())
+    }
+
     private val pickFile = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
         fileCallback?.onReceiveValue(android.webkit.WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
         fileCallback = null
@@ -30,6 +47,10 @@ class MainActivity : AppCompatActivity() {
         val startUrl = "https://appassets.androidplatform.net/index.html"
         val localMode = true
         val host = Uri.parse(startUrl).host
+        val ownHost = if (localMode) "appassets.androidplatform.net" else host
+        val allowCamera = true
+        val allowMic = true
+        val allowLocation = true
 
         // The site root is the packaged www folder, so "/style.css" resolves exactly like in Forge's preview.
         val loader = WebViewAssetLoader.Builder()
@@ -84,6 +105,29 @@ class MainActivity : AppCompatActivity() {
                     fileCallback?.onReceiveValue(null)
                     fileCallback = cb
                     return try { pickFile.launch(params.createIntent()); true } catch (_: Exception) { fileCallback = null; false }
+                }
+
+                // getUserMedia: only the app's own origin, only the capabilities enabled in Forge, after the Android runtime prompt.
+                override fun onPermissionRequest(request: android.webkit.PermissionRequest) {
+                    runOnUiThread {
+                        if (request.origin.host != ownHost) { request.deny(); return@runOnUiThread }
+                        val needed = ArrayList<String>()
+                        val grant = ArrayList<String>()
+                        for (r in request.resources) {
+                            if (r == android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE && allowCamera) { needed.add(android.Manifest.permission.CAMERA); grant.add(r) }
+                            if (r == android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE && allowMic) { needed.add(android.Manifest.permission.RECORD_AUDIO); grant.add(r) }
+                        }
+                        if (grant.isEmpty()) { request.deny(); return@runOnUiThread }
+                        ensurePermissions(needed) { ok -> if (ok) request.grant(grant.toTypedArray()) else request.deny() }
+                    }
+                }
+
+                override fun onGeolocationPermissionsShowPrompt(origin: String, callback: android.webkit.GeolocationPermissions.Callback) {
+                    if (!allowLocation || Uri.parse(origin).host != ownHost) { callback.invoke(origin, false, false); return }
+                    ensurePermissions(
+                        listOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION),
+                        requireAll = false,
+                    ) { ok -> callback.invoke(origin, ok, false) }
                 }
             }
         }

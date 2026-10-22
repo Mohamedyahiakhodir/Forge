@@ -1,7 +1,18 @@
 package app.wrapper
 
 import android.webkit.WebView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import org.json.JSONObject
+import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -10,15 +21,16 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.lifecycleScope
-import androidx.webkit.JavaScriptReplyProxy
-import androidx.webkit.WebViewCompat
-import androidx.webkit.WebViewFeature
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 object ForgeBridge {
+    private const val HAS_CAMERA = true
+    private const val HAS_MIC = true
+    private const val HAS_LOCATION = true
+    private const val HAS_NOTIFICATIONS = true
+
     private const val SHIM = """
 (function () {
   if (window.Forge) return;
@@ -40,14 +52,25 @@ object ForgeBridge {
     });
   }
   window.Forge = {
-    version: 1,
+    version: 2,
+    requestPermission: function (name) { return call('requestPermission', { name: name }).then(function (r) { return r.granted; }); },
+    permissionStatus: function (name) { return call('permissionStatus', { name: name }).then(function (r) { return r.granted; }); },
+    notify: function (options) { return call('notify', options); },
     googleSignIn: function (options) { return call('googleSignIn', options); },
     googleSignOut: function () { return call('googleSignOut'); }
   };
+  if (typeof window.Notification === 'undefined') {
+    var N = function (title, opts) { window.Forge.notify({ title: String(title), body: (opts && opts.body) || '' }); };
+    N.permission = 'default';
+    N.requestPermission = function () {
+      return window.Forge.requestPermission('notifications').then(function (ok) { N.permission = ok ? 'granted' : 'denied'; return N.permission; });
+    };
+    window.Notification = N;
+  }
 })();
 """
 
-    fun install(activity: AppCompatActivity, web: WebView, origins: Set<String>) {
+    fun install(activity: MainActivity, web: WebView, origins: Set<String>) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) ||
             !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
         WebViewCompat.addWebMessageListener(web, "__ForgeNative", origins) { _, message, _, isMainFrame, reply ->
@@ -57,7 +80,7 @@ object ForgeBridge {
         WebViewCompat.addDocumentStartJavaScript(web, SHIM, origins)
     }
 
-    private fun handle(activity: AppCompatActivity, raw: String, reply: JavaScriptReplyProxy) {
+    private fun handle(activity: MainActivity, raw: String, reply: JavaScriptReplyProxy) {
         val msg = try { JSONObject(raw) } catch (e: Exception) { return }
         val id = msg.optInt("id")
         val args = msg.optJSONObject("args") ?: JSONObject()
@@ -65,13 +88,79 @@ object ForgeBridge {
         fun ok(data: JSONObject) = send(JSONObject().put("ok", true).put("data", data))
         fun fail(code: String, message: String) = send(JSONObject().put("ok", false).put("code", code).put("error", message))
         when (msg.optString("op")) {
+            "requestPermission" -> requestPermission(activity, args, ::ok, ::fail)
+            "permissionStatus" -> permissionStatus(activity, args, ::ok, ::fail)
+            "notify" -> notify(activity, args, ::ok, ::fail)
             "googleSignIn" -> googleSignIn(activity, args, ::ok, ::fail)
             "googleSignOut" -> googleSignOut(activity, ::ok, ::fail)
             else -> fail("UNSUPPORTED", "Unknown operation")
         }
     }
 
-    private fun googleSignIn(activity: AppCompatActivity, args: JSONObject, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
+    /** Android permissions behind a capability name, or null if the app was built without that capability. */
+    private fun permissionsFor(name: String): List<String>? = when (name) {
+        "camera" -> if (HAS_CAMERA) listOf(android.Manifest.permission.CAMERA) else null
+        "microphone" -> if (HAS_MIC) listOf(android.Manifest.permission.RECORD_AUDIO) else null
+        "location" -> if (HAS_LOCATION) listOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION) else null
+        "notifications" -> if (!HAS_NOTIFICATIONS) null else if (android.os.Build.VERSION.SDK_INT >= 33) listOf("android.permission.POST_NOTIFICATIONS") else emptyList()
+        else -> null
+    }
+
+    private fun isGranted(activity: MainActivity, name: String): Boolean {
+        val perms = permissionsFor(name) ?: return false
+        if (name == "notifications" && Build.VERSION.SDK_INT < 33) return NotificationManagerCompat.from(activity).areNotificationsEnabled()
+        if (perms.isEmpty()) return true
+        fun has(p: String) = androidx.core.content.ContextCompat.checkSelfPermission(activity, p) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        return if (name == "location") perms.any { has(it) } else perms.all { has(it) }
+    }
+
+    private fun requestPermission(activity: MainActivity, args: JSONObject, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
+        val name = args.optString("name")
+        val perms = permissionsFor(name)
+        if (perms == null) { fail("NOT_ENABLED", "This capability is not enabled for the app: " + name); return }
+        activity.ensurePermissions(perms, requireAll = name != "location") { granted -> ok(JSONObject().put("granted", granted)) }
+    }
+
+    private fun permissionStatus(activity: MainActivity, args: JSONObject, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
+        val name = args.optString("name")
+        if (permissionsFor(name) == null) { fail("NOT_ENABLED", "This capability is not enabled for the app: " + name); return }
+        ok(JSONObject().put("granted", isGranted(activity, name)))
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun notify(activity: MainActivity, args: JSONObject, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
+        val title = args.optString("title")
+        val body = args.optString("body")
+        if (title.isEmpty()) { fail("BAD_ARGS", "title is required"); return }
+        activity.ensurePermissions(permissionsFor("notifications") ?: emptyList()) { granted ->
+            if (!granted || !NotificationManagerCompat.from(activity).areNotificationsEnabled()) {
+                fail("PERMISSION_DENIED", "Notifications are not allowed for this app")
+                return@ensurePermissions
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                activity.getSystemService(NotificationManager::class.java)
+                    .createNotificationChannel(NotificationChannel("default", "General", NotificationManager.IMPORTANCE_DEFAULT))
+            }
+            val open = PendingIntent.getActivity(
+                activity, 0,
+                Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val n = NotificationCompat.Builder(activity, "default")
+                .setSmallIcon(R.drawable.ic_stat_notify)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .build()
+            val id = args.optInt("id", (System.currentTimeMillis() % 1_000_000).toInt())
+            try { NotificationManagerCompat.from(activity).notify(id, n); ok(JSONObject().put("id", id)) }
+            catch (e: SecurityException) { fail("PERMISSION_DENIED", "Notifications are not allowed for this app") }
+        }
+    }
+
+    private fun googleSignIn(activity: MainActivity, args: JSONObject, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
         val builder = GetSignInWithGoogleOption.Builder(activity.getString(R.string.default_web_client_id))
         val nonce = args.optString("nonce")
         if (nonce.isNotEmpty()) builder.setNonce(nonce)
@@ -101,7 +190,7 @@ object ForgeBridge {
         }
     }
 
-    private fun googleSignOut(activity: AppCompatActivity, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
+    private fun googleSignOut(activity: MainActivity, ok: (JSONObject) -> Unit, fail: (String, String) -> Unit) {
         activity.lifecycleScope.launch {
             try {
                 CredentialManager.create(activity).clearCredentialState(ClearCredentialStateRequest())
