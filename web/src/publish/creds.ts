@@ -16,7 +16,21 @@ function copy(text: string): void {
   }
 }
 
-const details = (title: string, body: string) =>
+const SIGN_IN_SNIPPET = `// Works inside the packaged app. Send idToken to your backend (or to Firebase) to log the user in.
+async function signInWithGoogle() {
+  if (!window.Forge) throw new Error('Open the app, or use the Google web button in a browser');
+  try {
+    const user = await Forge.googleSignIn();      // { idToken, email, name, givenName, familyName, photo }
+    return user;
+  } catch (e) {
+    // e.code: CANCELLED | NO_CREDENTIAL | FAILED
+    throw e;
+  }
+}
+// Firebase Auth: firebase.auth().signInWithCredential(firebase.auth.GoogleAuthProvider.credential(user.idToken))
+// Sign out: await Forge.googleSignOut();`;
+
+const details =(title: string, body: string) =>
   h('details', { class: 'help' }, h('summary', {}, title), h('div', { class: 'help-body' }, body));
 
 export function renderCredsSection(box: HTMLElement, project: string, cfg: PublishConfig, onChange: () => void): void {
@@ -29,6 +43,18 @@ export function renderCredsSection(box: HTMLElement, project: string, cfg: Publi
     box.append(h('div', { class: 'pub-note' }, L(
       'اختياري — محتاجه لو تطبيقك فيه تسجيل دخول بجوجل أو إشعارات Firebase. الصق أي حاجة من اللي الأداة بتطلبها (ملف JSON، Client ID، بصمة SHA) والأداة تعرف نوعها وتحطها في مكانها الصح.',
       'Optional — needed if your app uses Google sign-in or Firebase notifications. Paste anything the tool asks for (JSON file text, Client ID, SHA fingerprint) and it will recognise it and put it in the right place.')));
+
+    const gsi = h('input', { type: 'checkbox', class: 'switch', checked: cfg.googleSignIn });
+    gsi.addEventListener('change', () => { cfg.googleSignIn = gsi.checked; saveConfig(project, cfg); onChange(); draw(); });
+    box.append(h('label', { class: 'set-row' }, h('span', {}, L('موقعي فيه تسجيل دخول بجوجل (جسر أصلي)', 'My site uses Google sign-in (native bridge)')), gsi));
+    if (cfg.googleSignIn) {
+      box.append(
+        h('div', { class: 'pub-note' }, L(
+          'التطبيق هيفتح نافذة Google الرسمية بدل صفحة الويب (اللي Google بيمنعها جوه التطبيق). في كود موقعك استخدم الدالة دي، وهي بتشتغل في التطبيق ولو الصفحة اتفتحت في متصفح عادي تقدر تستخدم زر Google الويب.',
+          'The app opens the official Google sheet instead of the web page (which Google blocks inside apps). In your site code use the function below; in a normal browser use the Google web button instead.')),
+        h('button', { class: 'btn', onclick: () => copy(SIGN_IN_SNIPPET) }, L('نسخ كود الاستخدام', 'Copy usage code')),
+        h('pre', { class: 'build-excerpt' }, SIGN_IN_SNIPPET));
+    }
 
     const paste = h('textarea', { class: 'field paste', rows: 4, placeholder: L('الصق هنا: محتوى google-services.json، أو Client ID، أو بصمة SHA-1/SHA-256', 'Paste here: google-services.json content, a Client ID, or an SHA-1/SHA-256 fingerprint'), spellcheck: false, autocapitalize: 'off' });
     const apply = (text: string) => {

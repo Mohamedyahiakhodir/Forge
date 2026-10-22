@@ -91,3 +91,8 @@ jobs:
         run: gradle bundleRelease --stacktrace --no-daemon
       - name: Check Firebase AAB exists
         run: ls -l fixtures/webapp-firebase/app/build/outputs/bundle/release/app-release.aab
+      - name: Build unsigned AAB from the native Google sign-in bridge fixture
+        working-directory: fixtures/webapp-google
+        run: gradle bundleRelease --stacktrace --no-daemon
+      - name: Check Google sign-in AAB exists
+        run: ls -l fixtures/webapp-google/app/build/outputs/bundle/release/app-release.aab

@@ -182,6 +182,17 @@ export async function runPreflight(project: string, c: PublishConfig): Promise<C
       r.push(err(L('ملف google-services.json تالف', 'google-services.json is corrupt'), L('نزّله من Firebase تاني وارفعه من جديد.', 'Download it from Firebase again and re-upload.')));
     }
   }
+  if (c.googleSignIn) {
+    if (!c.googleClientId.trim()) {
+      r.push(err(L('تسجيل الدخول بجوجل مفعّل من غير Client ID', 'Google sign-in is on but there is no Client ID'),
+        L('الصق الـWeb Client ID في "الملفات والبصمات" (بيتسحب تلقائي من google-services.json).', 'Paste the Web Client ID in "Files and fingerprints" (it is taken automatically from google-services.json).')));
+    } else {
+      r.push(warn(L('تأكد من إعداد Google Cloud لتسجيل الدخول', 'Check your Google Cloud setup for sign-in'),
+        L(`في Google Cloud Console ← Credentials لازم يكون عندك OAuth client من نوع Android باسم الحزمة ${pkg} وبصمة SHA-1 (مفتاح الرفع للتجربة، وبصمة توقيع Google Play للنسخة المنشورة)، وبجانبه الـWeb client اللي الصقته. من غيرهم النافذة هتفشل.`,
+          `In Google Cloud Console → Credentials you need an OAuth client of type Android with package ${pkg} and the SHA-1 (upload key for testing, Google Play signing key for the published app), next to the Web client you pasted. Without them the sign-in sheet will fail.`)));
+    }
+    if (c.source === 'url' && !/^https:\/\//i.test(c.url.trim())) r.push(err(L('الجسر يحتاج موقع https', 'The bridge needs an https site'), L('استخدم رابط https.', 'Use an https URL.')));
+  }
   if (c.googleClientId.trim() && !isClientId(c.googleClientId)) {
     r.push(err(L('Google Client ID شكله غلط', 'Google Client ID looks wrong'), L('لازم يبقى شكله 123456789-abc.apps.googleusercontent.com. انسخه كامل من Google Cloud Console ← Credentials ← Web client.', 'It should look like 123456789-abc.apps.googleusercontent.com. Copy it fully from Google Cloud Console → Credentials → Web client.')));
   }

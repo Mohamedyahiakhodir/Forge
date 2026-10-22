@@ -21,6 +21,7 @@ export interface PublishConfig {
   internet: boolean;
   vibrate: boolean;
   googleClientId: string;
+  googleSignIn: boolean;
   playSha1: string;
   playSha256: string;
 }
@@ -43,6 +44,7 @@ export function defaults(project: string): PublishConfig {
     internet: true,
     vibrate: false,
     googleClientId: '',
+    googleSignIn: false,
     playSha1: '',
     playSha256: '',
   };
