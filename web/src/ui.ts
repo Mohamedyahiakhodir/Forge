@@ -56,9 +56,9 @@ export function menuSheet(title: string, items: MenuItem[]): void {
   }
 }
 
-export function promptText(title: string, value = '', placeholder = ''): Promise<string | null> {
+export function promptText(title: string, value = '', placeholder = '', type = 'text'): Promise<string | null> {
   return new Promise((resolve) => {
-    const input = h('input', { class: 'field', type: 'text', value, placeholder, autocapitalize: 'off', autocomplete: 'off', spellcheck: false });
+    const input = h('input', { class: 'field', type, value, placeholder, autocapitalize: 'off', autocomplete: 'off', spellcheck: false });
     let done = false;
     const finish = (v: string | null) => { if (done) return; done = true; close(); resolve(v); };
     const close = overlay(

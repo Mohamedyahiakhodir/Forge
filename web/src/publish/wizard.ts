@@ -1,6 +1,7 @@
 import { bridge } from '../native';
 import { h, fullSheet, toast, debounce, joinPath, extOf } from '../ui';
-import { L, loadConfig, saveConfig, type PublishConfig } from './config';
+import { L, loadConfig, saveConfig, slug, type PublishConfig } from './config';
+import { renderKeySection } from './keys';
 import { runPreflight, hasErrors, type Check } from './preflight';
 import { generateProject, androidDir } from './generate';
 
@@ -94,6 +95,11 @@ export function openPublish(project: string): void {
 
     section(L('الخصوصية', 'Privacy'));
     field(L('رابط سياسة الخصوصية (https)', 'Privacy policy URL (https)'), 'privacyUrl');
+
+    section(L('مفتاح التوقيع', 'Signing key'));
+    const keyBox = h('div', {});
+    body.append(keyBox);
+    renderKeySection(keyBox, project, () => slug(cfg.appName), () => cfg.versionCode, () => { void refresh(); });
 
     section(L('الفحص قبل النشر', 'Pre-publish checks'));
     body.append(checksBox, genBtn, status);

@@ -3,6 +3,7 @@
 
 export interface Entry { name: string; isDir: boolean; size: number; mtime: number }
 export interface Stat { exists: boolean; isDir: boolean; size: number; mtime: number }
+export interface KeyMeta { alias: string; subject: string; sha256: string; sha1: string; notAfter: number; created: number }
 export interface Match { path: string; line: number; col: number; len: number; text: string }
 
 declare global {
@@ -58,6 +59,15 @@ export interface Bridge {
   openExternal(path: string): void;
   toast(msg: string): void;
   exit(): void;
+  keyList(): KeyMeta[];
+  keyCreate(alias: string, password: string, cn: string, org: string, country: string): KeyMeta;
+  keyDelete(alias: string): void;
+  keyExport(alias: string): void;
+  keyExportCert(alias: string): void;
+  keyImport(alias: string, password: string): void;
+  signAab(inputRel: string, alias: string, password: string, outputRel: string): void;
+  saveFileAs(rel: string, displayName: string, mime: string): void;
+  importFile(project: string): void;
   assetUrl(path: string): string;
 }
 
@@ -85,6 +95,15 @@ const nativeBridge: Bridge = {
   openExternal: (p) => native('openExternal', p),
   toast: (m) => native('toast', m),
   exit: () => native('exit'),
+  keyList: () => native('keyList'),
+  keyCreate: (a, p, cn, o, c) => native('keyCreate', a, p, cn, o, c),
+  keyDelete: (a) => native('keyDelete', a),
+  keyExport: (a) => native('keyExport', a),
+  keyExportCert: (a) => native('keyExportCert', a),
+  keyImport: (a, p) => native('keyImport', a, p),
+  signAab: (i, a, p, o) => native('signAab', i, a, p, o),
+  saveFileAs: (r, n, m) => native('saveFileAs', r, n, m),
+  importFile: (p) => native('importFile', p),
   assetUrl: (p) => `${ASSET_ORIGIN}/files/${p.split('/').map(encodeURIComponent).join('/')}`,
 };
 
@@ -164,6 +183,15 @@ const mockBridge: Bridge = {
   openExternal() { alert('Open externally needs the Android app'); },
   toast: (m) => console.log('[toast]', m),
   exit: () => undefined,
+  keyList: () => [],
+  keyCreate: () => { throw new Error('Signing keys need the Android app'); },
+  keyDelete() { /* needs Android */ },
+  keyExport() { alert('Needs the Android app'); },
+  keyExportCert() { alert('Needs the Android app'); },
+  keyImport() { alert('Needs the Android app'); },
+  signAab() { throw new Error('Signing needs the Android app'); },
+  saveFileAs() { alert('Needs the Android app'); },
+  importFile() { alert('Needs the Android app'); },
   assetUrl: (p) => {
     const n = mem.get(norm(p));
     if (!n || n.dir) return '';

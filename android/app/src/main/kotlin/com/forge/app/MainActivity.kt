@@ -20,6 +20,13 @@ import org.json.JSONObject
 import java.io.File
 import kotlin.concurrent.thread
 
+/** CreateDocument variant whose MIME type is chosen per call, so Android does not append a wrong extension (.bin/.txt). */
+class CreateDocWithType : androidx.activity.result.contract.ActivityResultContract<Pair<String, String>, Uri?>() {
+    override fun createIntent(context: android.content.Context, input: Pair<String, String>) =
+        Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(input.second).putExtra(Intent.EXTRA_TITLE, input.first)
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? = if (resultCode == android.app.Activity.RESULT_OK) intent?.data else null
+}
+
 class MainActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private lateinit var store: FileStore
@@ -72,10 +79,70 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ----- signing keys + generic "save a file to the phone" / "import a file into a project" -----
+    lateinit var vault: KeyVault
+    private var pendingSave: File? = null
+    private var pendingImportProject: String? = null
+    private var pendingKeyAlias: String? = null
+    private var pendingKeyPassword: String? = null
+
+    private val saveLauncher = registerForActivityResult(CreateDocWithType()) { uri ->
+        val src = pendingSave
+        pendingSave = null
+        if (uri != null && src != null) runAsync("importError") {
+            contentResolver.openOutputStream(uri)?.use { os -> src.inputStream().use { it.copyTo(os) } } ?: error("Cannot write file")
+            emit("exportDone", JSONObject())
+        }
+    }
+
+    private val importFileLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val project = pendingImportProject
+        pendingImportProject = null
+        if (uri != null && project != null) runAsync("importError") {
+            val name = DocumentFile.fromSingleUri(this, uri)?.name ?: "file"
+            val safe = name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            var target = File(store.resolve(project), safe)
+            var n = 2
+            while (target.exists()) target = File(store.resolve(project), "$n-$safe").also { n++ }
+            contentResolver.openInputStream(uri)?.use { ins -> target.outputStream().use { ins.copyTo(it) } } ?: error("Cannot open file")
+            emit("fileImported", JSONObject().put("path", "$project/${target.name}"))
+        }
+    }
+
+    private val keyImportLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val alias = pendingKeyAlias
+        val pw = pendingKeyPassword
+        pendingKeyAlias = null; pendingKeyPassword = null
+        if (uri != null && alias != null && pw != null) runAsync("keyError") {
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Cannot open file")
+            emit("keyImported", vault.importKey(alias, pw, bytes))
+        }
+    }
+
+    fun launchSave(file: File, displayName: String, mime: String) { pendingSave = file; saveLauncher.launch(displayName to mime) }
+    fun launchImportFile(project: String) { pendingImportProject = project; importFileLauncher.launch(arrayOf("*/*")) }
+    fun launchKeyImport(alias: String, password: String) { pendingKeyAlias = alias; pendingKeyPassword = password; keyImportLauncher.launch(arrayOf("*/*")) }
+
+    /** Signs on a background thread (large bundles take seconds) and reports through the 'signDone' / 'signError' events. */
+    fun startSign(input: File, output: File, alias: String, password: String, outRel: String) {
+        thread(name = "forge-sign") {
+            try {
+                val loaded = com.forge.app.sign.KeyTools.load(vault.p12(alias), password.toCharArray())
+                com.forge.app.sign.AabSigner.sign(input, output, loaded.key, loaded.cert)
+                emit("signDone", JSONObject().put("path", outRel).put("size", output.length()))
+            } catch (e: Throwable) {
+                output.delete()
+                val wrongPw = e is java.io.IOException && (e.message ?: "").contains("password", ignoreCase = true)
+                emit("signError", JSONObject().put("message", if (wrongPw) "WRONG_PASSWORD" else (e.message ?: e.javaClass.simpleName)))
+            }
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = FileStore(File(filesDir, "projects"))
+        vault = KeyVault(File(filesDir, "keys"))
 
         val loader = WebViewAssetLoader.Builder()
             .setDomain(ORIGIN_HOST)

@@ -75,6 +75,40 @@ class ForgeBridge(private val activity: MainActivity, private val store: FileSto
         }
     }
 
+    // ----- upload key vault + AAB signing -----
+    @JavascriptInterface fun keyList() = reply { activity.vault.list() }
+    @JavascriptInterface fun keyCreate(alias: String, password: String, cn: String, org: String, country: String) =
+        reply { activity.vault.create(alias, password, cn, org, country) }
+    @JavascriptInterface fun keyDelete(alias: String) = reply { activity.vault.delete(alias) }
+    @JavascriptInterface fun keyExport(alias: String) = reply {
+        val f = activity.vault.p12(alias); require(f.isFile) { "Key not found" }
+        activity.runOnUiThread { activity.launchSave(f, "$alias-upload-key.p12", "application/x-pkcs12") }
+    }
+    @JavascriptInterface fun keyExportCert(alias: String) = reply {
+        val f = activity.vault.pem(alias); require(f.isFile) { "Certificate not found" }
+        activity.runOnUiThread { activity.launchSave(f, "$alias-upload-certificate.pem", "application/x-pem-file") }
+    }
+    @JavascriptInterface fun keyImport(alias: String, password: String) = reply {
+        activity.vault.p12(alias) // validates the name early
+        activity.runOnUiThread { activity.launchKeyImport(alias, password) }
+    }
+
+    @JavascriptInterface fun signAab(inputRel: String, alias: String, password: String, outputRel: String) = reply {
+        val input = store.resolve(inputRel); require(input.isFile) { "Bundle not found" }
+        val output = store.resolve(outputRel)
+        require(activity.vault.p12(alias).isFile) { "Key not found" }
+        activity.startSign(input, output, alias, password, outputRel)
+    }
+
+    @JavascriptInterface fun saveFileAs(rel: String, displayName: String, mime: String) = reply {
+        val f = store.resolve(rel); require(f.isFile) { "File not found" }
+        activity.runOnUiThread { activity.launchSave(f, displayName, mime) }
+    }
+    @JavascriptInterface fun importFile(project: String) = reply {
+        store.resolve(project)
+        activity.runOnUiThread { activity.launchImportFile(project) }
+    }
+
     @JavascriptInterface
     fun toast(msg: String) = reply { activity.runOnUiThread { Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show() } }
 

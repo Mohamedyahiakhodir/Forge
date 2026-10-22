@@ -141,6 +141,12 @@ export async function runPreflight(project: string, c: PublishConfig): Promise<C
     r.push(warn(L('مفيش رابط سياسة خصوصية', 'No privacy policy URL'), L('Google Play بيطلبه (وإلزامي لو التطبيق بيجمع بيانات أو بيستخدم الإنترنت). ارفع صفحة سياسة الخصوصية على موقعك وحط رابطها https.', 'Google Play asks for it (mandatory if the app collects data or uses the Internet). Host a privacy page and enter its https link.')));
   } else r.push(ok(L('رابط سياسة الخصوصية موجود', 'Privacy policy URL set')));
 
+  // --- signing key ---
+  let hasKey = false;
+  try { hasKey = bridge.keyList().length > 0; } catch { hasKey = false; }
+  if (!hasKey) r.push(warn(L('لسه مفيش مفتاح توقيع', 'No signing key yet'), L('أنشئ مفتاح التوقيع من قسم "مفتاح التوقيع" تحت. من غيره مش هتقدر توقّع ملف الـAAB.', 'Create the key in the "Signing key" section below. Without it you cannot sign the AAB.')));
+  else r.push(ok(L('مفتاح التوقيع موجود', 'Signing key is present')));
+
   r.push(ok(L(`مستوى الـ API المستهدف = ${TARGET_SDK} (مطابق لمتطلبات Play)`, `Target API = ${TARGET_SDK} (meets Play requirements)`)));
   return r;
 }
