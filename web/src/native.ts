@@ -172,3 +172,4 @@ const mockBridge: Bridge = {
 };
 
 export const bridge: Bridge = window.ForgeNative ? nativeBridge : mockBridge;
+if (!window.ForgeNative) (window as any).__forgeMock = mockBridge; // desktop-browser testing hook

@@ -149,6 +149,19 @@ input.switch { width: 44px; height: 24px; accent-color: var(--accent); }
 .pick-path { padding: 10px 14px; color: var(--muted); font-size: 13px; }
 .picker { padding: 0 10px; }
 
+.set-row.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+.set-row.stack .field { width: 100%; max-width: none; }
+input[type=color].field { height: 44px; padding: 4px; }
+.pub-intro { padding: 8px 0 4px; color: var(--muted); line-height: 1.6; }
+.pub-note { padding: 10px 0; line-height: 1.6; }
+.pub-status { padding: 10px 2px; line-height: 1.6; }
+.checks { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
+.check { padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.check.error { border-color: var(--danger); }
+.check.warn { border-color: #f5a623; }
+.check .cf { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.btn:disabled { opacity: .45; }
+
 .search-panel { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 .sp-row { display: flex; gap: 6px; align-items: center; } .sp-row.wrap { flex-wrap: wrap; }
 .search-summary { color: var(--muted); font-size: 12px; padding: 2px 2px; }

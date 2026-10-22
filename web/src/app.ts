@@ -14,6 +14,8 @@ import { buildKeybar } from './keybar';
 import { buildSearchPanel } from './search';
 import { openSettings } from './settingsui';
 import { TEMPLATES } from './templates';
+import { openPublish } from './publish/wizard';
+import { L } from './publish/config';
 
 type Kind = 'text' | 'image' | 'video' | 'audio' | 'pdf' | 'binary';
 interface Tab {
@@ -525,6 +527,7 @@ function projectsSheet(): void {
       ...(ps.length ? ps.map((p) => h('div', { class: 'proj-row' + (p === project ? ' current' : '') },
         h('button', { class: 'proj-open', onclick: () => { sheet.close(); void openProject(p); } }, '📁 ' + p),
         h('button', { class: 'icon-btn', 'aria-label': t('more'), onclick: () => menuSheet(p, [
+          { label: L('النشر على Google Play', 'Publish to Google Play'), run: () => { sheet.close(); openPublish(p); } },
           { label: t('exportZip'), run: () => bridge.exportZip(p) },
           { label: t('exportFolder'), run: () => bridge.exportFolder(p) },
           { label: t('deleteProject'), danger: true, run: async () => {
@@ -608,6 +611,7 @@ function editorMenu(): void {
     { label: t('unfoldAll'), icon: '▾', run: c.unfoldAll },
     { label: t('toggleWrap'), icon: '↩', run: () => update({ wordWrap: !effective().wordWrap }) },
     { label: t('saveAll'), icon: '💾', run: () => manualSave(true) },
+    ...(project ? [{ label: L('النشر على Google Play', 'Publish to Google Play'), icon: '🚀', run: () => { manualSave(true); openPublish(project); } }] : []),
   ]);
 }
 
